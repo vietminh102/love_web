@@ -1,0 +1,19 @@
+# Bỏ qua môi trường ảo của Python
+lovelink-backend/venv/
+lovelink-backend/__pycache__/
+lovelink-backend/.pytest_cache/
+
+# Bỏ qua thư viện của Node.js (React)
+lovelink-frontend/node_modules/
+lovelink-frontend/dist/
+lovelink-frontend/.next/
+
+# Bỏ qua các file chứa biến môi trường (Mật khẩu, Key API)
+.env
+*.env
+lovelink-backend/.env
+lovelink-frontend/.env
+
+# Bỏ qua file log và hệ điều hành
+*.log
+.DS_Store
