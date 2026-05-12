@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu quan hệ (Người dùng, Cặp đôi)
+  postgres:
+    image: postgres:15-alpine
+    container_name: lovelink_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 130404
+      POSTGRES_DB: lovelink_core
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # 2. Cơ sở dữ liệu NoSQL (Nhật ký, AI, Tin nhắn)
+  mongodb:
+    image: mongo:6.0
+    container_name: lovelink_mongo
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: lovelink_content
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  # 3. Cache & Real-time (Trạng thái Online/Offline, WebRTC)
+  redis:
+    image: redis:7-alpine
+    container_name: lovelink_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+# Khai báo Volumes để giữ lại dữ liệu khi tắt máy
+volumes:
+  pgdata:
+  mongodata:
