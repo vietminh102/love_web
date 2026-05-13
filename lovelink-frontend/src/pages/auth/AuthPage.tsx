@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Heart, Mail, Lock, User, Sparkles } from 'lucide-react'; // Đã bỏ Calendar vì không dùng nữa
+import { Heart, Mail, Lock, User, Sparkles } from 'lucide-react'; 
 import React, { useState } from 'react';
 import { authService } from '../../services/authService';
 
@@ -36,7 +36,6 @@ function AuthPage() {
         
         // CẬP NHẬT: Backend trả về toàn bộ thông tin user trong data.user
         login(data.access_token, data.user); 
-        alert('Đăng nhập thành công! 💕');
         navigate('/home');
 
       } else {
@@ -180,6 +179,13 @@ function AuthPage() {
               )}
             </button>
           </form>
+          
+          {/* Quote */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500 italic">
+              "Tình yêu không phải là nhìn nhau, mà là cùng nhìn về một hướng" 💕
+            </p>
+          </div>
         </div>
       </div>
     </div>
