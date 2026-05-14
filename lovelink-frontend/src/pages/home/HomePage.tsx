@@ -19,8 +19,9 @@ export default function HomePage() {
   const [isUpdating, setIsUpdating] = useState(false); // Trạng thái đang gửi API
   const [updateError, setUpdateError] = useState('');
   // --- STATES CHO GIAO DIỆN CHÍNH ---
-  const [daysInLove, setDaysInLove] = useState(0);
-  const [anniversaryDate, setAnniversaryDate] = useState('2024-01-14');
+  const [startDateDB, setStartDateDB] = useState<string | null>(null);
+  const [loveTime, setLoveTime] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [editDateInput, setEditDateInput] = useState(''); // Lưu tạm giá trị khi đang chỉnh sửa ngày
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [partnerNames, setPartnerNames] = useState({ 
     name1: user?.display_name || 'Bạn', 
@@ -65,22 +66,77 @@ export default function HomePage() {
 
   // UseEffect 2: Chỉ lo tính toán ngày yêu
   useEffect(() => {
-    const calculateDays = () => {
-      if (!anniversaryDate) return setDaysInLove(0);
-      const start = new Date(anniversaryDate);
-      const today = new Date();
-      start.setHours(0, 0, 0, 0);
-      today.setHours(0, 0, 0, 0);
-      const diffTime = today.getTime() - start.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysInLove(diffDays > 0 ? diffDays : 0);
+    const fetchPartner = async () => {
+      try {
+        const data = await coupleService.getPartnerInfo();
+        if (data.has_partner) {
+          setPartnerNames(prev => ({ ...prev, name2: data.display_name }));
+          if (data.avatar_url) setPartnerAvatar(data.avatar_url);
+          
+          // BỔ SUNG: Lấy ngày bắt đầu yêu từ CSDL
+          if (data.start_date) {
+            setStartDateDB(data.start_date);
+            // Đổi ra định dạng dùng cho input datetime-local (YYYY-MM-DDTHH:mm)
+            const dateObj = new Date(data.start_date);
+    const tzOffset = dateObj.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(dateObj.getTime() - tzOffset)).toISOString().slice(0, 16);
+    
+    setEditDateInput(localISOTime);
+          }
+        } else {
+          setPartnerNames(prev => ({ ...prev, name2: '(Chưa ghép đôi)' }));
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải thông tin đối phương:", error);
+      }
     };
-    calculateDays();
-    const interval = setInterval(calculateDays, 1000 * 60 * 60);
-    return () => clearInterval(interval);
-  }, [anniversaryDate]);
+    fetchPartner();
+  }, []);
 
+  // ĐẾM GIÂY
+  useEffect(() => {
+    // Chỉ chạy đồng hồ khi đã có thông tin đối tác và ngày bắt đầu
+    if (!hasPartner || !startDateDB) return;
 
+    // 1. Tách công thức tính toán ra thành một hàm độc lập
+    const calculateTime = () => {
+      const start = new Date(startDateDB).getTime();
+      const now = new Date().getTime();
+      const diffTime = Math.max(0, now - start); // Tránh ra số âm nếu lỡ chọn ngày tương lai
+
+      setLoveTime({
+        days: Math.floor(diffTime / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diffTime / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diffTime / (1000 * 60)) % 60),
+        seconds: Math.floor((diffTime / 1000) % 60)
+      });
+    };
+
+    // 2. GỌI NGAY LẬP TỨC 1 LẦN khi vừa mở web (Để không bị khựng 1 giây đầu)
+    calculateTime();
+
+    // 3. Lên lịch cho hàm calculateTime tự động chạy lại liên tục cứ mỗi 1000ms (1 giây)
+    const timer = setInterval(calculateTime, 1000);
+
+    // 4. Dọn dẹp bộ nhớ (Tắt đồng hồ) nếu người dùng chuyển sang trang khác
+    return () => clearInterval(timer);
+  }, [hasPartner, startDateDB]);
+
+  // HÀM LƯU NGÀY VÀO DATABASE
+  const handleSaveDate = async () => {
+    try {
+      // Đổi lại thành chuẩn ISO gửi về Backend
+      const localDate = new Date(editDateInput);
+      const utcStringToSend = localDate.toISOString();
+      const res = await coupleService.updateStartDate(utcStringToSend);
+      
+      setStartDateDB(res.new_start_date);
+      setIsEditingDate(false);
+      alert("Đã cập nhật thời gian thành công! 💕");
+    } catch (e) {
+      alert("Có lỗi xảy ra khi lưu ngày.");
+    }
+  };
 
   // Hàm tự động phát nhạc an toàn
   const safePlayMusic = async () => {
@@ -669,19 +725,25 @@ const handlePairing = async () => {
         </div>
 
         {/* Big Heart Container */}
-        <div className="relative">
+        <div className="relative my-8">
+          
+          {/* Vòng tròn nhịp đập phía sau (Đã được phóng to) */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-100 h-100 border-4 border-pink-300 rounded-full opacity-20 animate-ping" style={{ animationDuration: '3s' }} />
+            <div className="w-95 h-95 sm:w-125 sm:h-125 border-4 border-pink-300 rounded-full opacity-20 animate-ping" style={{ animationDuration: '3s' }} />
           </div>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-87.5 h-87.5 border-4 border-rose-300 rounded-full opacity-30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+            <div className="w-82.5 h-82.5 sm:w-107.5 sm:h-107.5 border-4 border-rose-300 rounded-full opacity-30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
           </div>
 
-          {/* Main Heart */}
-          <div className="relative w-80 h-80 flex items-center justify-center">
+          {/* Main Heart (Phóng to lên sm:w-[420px] sm:h-[420px]) */}
+          <div className="relative w-95 h-95 sm:w-125 sm:h-125 flex items-center justify-center">
+            
+            {/* Lớp trái tim nền */}
             <svg viewBox="0 0 24 24" className="absolute w-full h-full text-pink-500 fill-pink-500 opacity-90 animate-heartbeat drop-shadow-2xl">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
+            
+            {/* Lớp trái tim Gradient bên trên */}
             <svg viewBox="0 0 24 24" className="absolute w-[90%] h-[90%] animate-pulse" style={{ animationDuration: '2s' }}>
               <defs>
                 <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -692,19 +754,56 @@ const handlePairing = async () => {
             </svg>
 
             {/* Days Counter Inside Heart */}
-            <div className="relative z-10 text-center flex flex-col items-center -mt-2.5">
-              <div className="text-7xl font-black text-white drop-shadow-lg leading-none" style={{ animationDuration: '3s' }}>
-                {daysInLove}
+            {hasPartner ? (
+              // Đã đổi thành -mt-10 để kéo nội dung lên giữa vùng phình to của trái tim
+              <div className="relative z-10 flex flex-col items-center justify-center -mt-8 sm:-mt-12">
+                <span className="text-pink-100 text-sm font-medium tracking-widest uppercase mb-1 drop-shadow-md">
+                  Đã bên nhau
+                </span>
+                
+                <div className="flex items-baseline gap-1.5">
+                  {/* Phóng to font chữ số NGÀY lên text-8xl */}
+                  <span className="text-7xl sm:text-8xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] tracking-tighter">
+                    {loveTime.days}
+                  </span>
+                  <span className="text-xl sm:text-2xl font-bold text-white/90 drop-shadow-md mb-2">
+                    ngày
+                  </span>
+                </div>
+
+                <div className="mt-2 sm:mt-4 flex items-center justify-center gap-2 sm:gap-3 bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
+                  <div className="flex flex-col items-center w-10">
+                    <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.hours.toString().padStart(2, '0')}</span>
+                    <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Giờ</span>
+                  </div>
+                  
+                  <span className="text-xl font-bold text-pink-200 animate-pulse pb-4">:</span>
+                  
+                  <div className="flex flex-col items-center w-10">
+                    <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.minutes.toString().padStart(2, '0')}</span>
+                    <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Phút</span>
+                  </div>
+
+                  <span className="text-xl font-bold text-pink-200 animate-pulse pb-4">:</span>
+                  
+                  <div className="flex flex-col items-center w-10">
+                    <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.seconds.toString().padStart(2, '0')}</span>
+                    <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Giây</span>
+                  </div>
+                </div>
               </div>
-              <div className="text-xl font-bold text-white/95 mt-1 drop-shadow-md">ngày</div>
-              <div className="text-sm font-medium text-white/90 drop-shadow-md">yêu nhau</div>
-            </div>
+            ) : (
+              <div className="relative z-10 text-center flex flex-col items-center -mt-6">
+                <div className="text-6xl sm:text-8xl font-black text-white/40 drop-shadow-lg leading-none animate-pulse">?</div>
+                <div className="text-sm sm:text-base font-medium text-white/80 drop-shadow-md mt-4 tracking-wide">Đang đợi người ấy...</div>
+              </div>
+            )}
 
             {/* Floating Hearts Around */}
-            <Heart className="absolute -top-8 -left-8 w-12 h-12 text-pink-400 fill-pink-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0s', animationDuration: '2s' }} />
-            <Heart className="absolute -top-8 -right-8 w-10 h-10 text-rose-400 fill-rose-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.3s', animationDuration: '2.2s' }} />
-            <Heart className="absolute -bottom-8 -left-8 w-10 h-10 text-red-400 fill-red-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0.6s', animationDuration: '2.5s' }} />
-            <Heart className="absolute -bottom-8 -right-8 w-12 h-12 text-pink-400 fill-pink-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.9s', animationDuration: '2.8s' }} />
+            <Heart className="absolute -top-8 -left-8 sm:-top-12 sm:-left-12 w-12 h-12 text-pink-400 fill-pink-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0s', animationDuration: '2s' }} />
+            <Heart className="absolute -top-8 -right-8 sm:-top-10 sm:-right-10 w-10 h-10 text-rose-400 fill-rose-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.3s', animationDuration: '2.2s' }} />
+            <Heart className="absolute -bottom-8 -left-8 sm:-bottom-12 sm:-left-12 w-10 h-10 text-red-400 fill-red-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0.6s', animationDuration: '2.5s' }} />
+            <Heart className="absolute -bottom-8 -right-8 sm:-bottom-10 sm:-right-10 w-12 h-12 text-pink-400 fill-pink-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.9s', animationDuration: '2.8s' }} />
           </div>
         </div>
 
@@ -713,15 +812,18 @@ const handlePairing = async () => {
           {isEditingDate ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Ngày kỷ niệm</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Thời khắc bắt đầu yêu</label>
                 <input
-                  type="date"
-                  value={anniversaryDate}
-                  onChange={(e) => setAnniversaryDate(e.target.value)}
+                  type="datetime-local" // Thay đổi từ "date" sang "datetime-local"
+                  value={editDateInput} // Sử dụng state editDateInput
+                  onChange={(e) => setEditDateInput(e.target.value)}
                   className="w-full px-4 py-3 bg-pink-50/50 border border-pink-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium"
                 />
               </div>
-              <button onClick={() => setIsEditingDate(false)} className="w-full mt-2 py-3 bg-linear-to-r from-pink-400 to-rose-500 hover:from-pink-500 hover:to-rose-600 text-white font-bold rounded-xl shadow-lg shadow-pink-200 transform transition-all active:scale-[0.98]">
+              <button 
+                onClick={handleSaveDate} // Thay đổi từ setisEditingDate sang gọi hàm API
+                className="w-full mt-2 py-3 bg-linear-to-r from-pink-400 to-rose-500 hover:from-pink-500 hover:to-rose-600 text-white font-bold rounded-xl shadow-lg shadow-pink-200 transform transition-all active:scale-[0.98]"
+              >
                 Lưu ngày
               </button>
             </div>
@@ -729,16 +831,20 @@ const handlePairing = async () => {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 text-gray-600 font-medium mb-3">
                 <Calendar className="w-5 h-5 text-pink-500" />
-                <span>Ngày bắt đầu yêu</span>
+                <span>Bắt đầu yêu từ</span>
               </div>
-              <div className="text-3xl font-bold text-transparent bg-clip-text bg-linear-to-r from-pink-600 to-rose-600 mb-5">
-                {anniversaryDate ? new Date(anniversaryDate).toLocaleDateString('vi-VN', {
-                  day: '2-digit', month: '2-digit', year: 'numeric'
+              <div className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-pink-600 to-rose-600 mb-5">
+                {startDateDB ? new Date(startDateDB).toLocaleString('vi-VN', {
+                  hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
                 }) : 'Chưa thiết lập'}
               </div>
-              <button onClick={() => setIsEditingDate(true)} className="text-sm font-bold text-pink-500 hover:text-pink-600 transition-colors hover:underline underline-offset-4">
-                Chỉnh sửa ngày
-              </button>
+              
+              {/* Chỉ cho phép đổi ngày nếu đang có bồ */}
+              {hasPartner && (
+                <button onClick={() => setIsEditingDate(true)} className="text-sm font-bold text-pink-500 hover:text-pink-600 transition-colors hover:underline underline-offset-4">
+                  Chỉnh sửa thời gian
+                </button>
+              )}
             </div>
           )}
         </div>

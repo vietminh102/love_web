@@ -35,7 +35,7 @@ class CoupleDB(Base):
     # Có thể null nếu người kia chưa nhập mã pairing_code
     user2_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True) 
     
-    start_date = Column(Date, nullable=True) # Ngày kỷ niệm
+    start_date = Column(DateTime(timezone=True), nullable=True) # Ngày kỷ niệm
     pairing_code = Column(String(10), unique=True, nullable=True, index=True) # Mã để kết nối cặp đôi
     background_url = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)

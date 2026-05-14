@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.sql import get_db
 from app.models.postgres import UserDB, CoupleDB
 from app.api.deps import get_current_user
 from app.schemas.couple import PairRequest # Import Schema vừa tạo
 from app.api.auth import generate_pairing_code
+from app.schemas.couple import UpdateStartDateRequest
+from sqlalchemy import delete
 
 router = APIRouter(prefix="/couple", tags=["Couple"])
 
@@ -31,7 +33,31 @@ async def get_couple_info(
         raise HTTPException(status_code=404, detail="Không tìm thấy thông tin ghép đôi")
         
     return couple
+@router.put("/start-date")
+async def update_start_date(
+    request: UpdateStartDateRequest,
+    current_user: UserDB = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Cập nhật ngày bắt đầu hẹn hò"""
+    result = await db.execute(
+        select(CoupleDB).where(
+            (CoupleDB.user1_id == current_user.id) | (CoupleDB.user2_id == current_user.id)
+        )
+    )
+    couple = result.scalars().first()
 
+    if not couple or couple.user2_id is None:
+        raise HTTPException(status_code=400, detail="Bạn chưa ghép đôi!")
+
+    try:
+        couple.start_date = request.new_start_date
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Lỗi cập nhật ngày")
+        
+    return {"message": "Đã cập nhật ngày kỉ niệm!", "new_start_date": couple.start_date.isoformat()}
 @router.post("/pair")
 async def pair_with_partner(
     request: PairRequest, 
@@ -76,7 +102,9 @@ async def pair_with_partner(
     try:
         # Cập nhật ID của mình vào hồ sơ của đối phương
         target_couple.user2_id = current_user.id
-        
+        # Ghi nhận chính xác số giây hai bạn bắt đầu yêu
+        target_couple.start_date = datetime.now(timezone.utc)
+        print(f"DEBUG: Bat dau ghep doi luc {target_couple.start_date}")
         # Xóa các record "độc thân" cũ của mình để tránh rác Database
         for c in my_couples:
             if c.id != target_couple.id:
@@ -122,7 +150,8 @@ async def get_partner_info(
         return {
             "has_partner": True,
             "display_name": partner.display_name,
-            "avatar_url": partner.avatar_url # Tiện thể lấy luôn ảnh đại diện (nếu có)
+            "avatar_url": partner.avatar_url, # Tiện thể lấy luôn ảnh đại diện (nếu có)
+            "start_date": couple.start_date.isoformat() if couple.start_date else None
         }
         
     return {"has_partner": False}
@@ -131,51 +160,41 @@ async def unpair_partner(
     current_user: UserDB = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Hủy ghép đôi: Xóa lịch sử và cấp ngay mã FA mới cho cả 2"""
-    
-    # 1. Tìm bản ghi ghép đôi hiện tại
+    # 1. Tìm ID của đối phương trước khi xóa
     result = await db.execute(
         select(CoupleDB).where(
             (CoupleDB.user1_id == current_user.id) | (CoupleDB.user2_id == current_user.id)
         )
     )
     couple = result.scalars().first()
-
-    if not couple or couple.user2_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Bạn hiện tại chưa ghép đôi với ai."
-        )
-
-    # 2. LƯU LẠI ID của đối phương trước khi xóa dữ liệu
+    if not couple:
+        raise HTTPException(status_code=400, detail="Bạn không có cặp đôi nào để hủy.")
+    
     partner_id = couple.user2_id if couple.user1_id == current_user.id else couple.user1_id
 
     try:
-        # 3. Xóa bản ghi ghép đôi (Xé giấy đăng ký)
-        await db.delete(couple)
-        
-        # BẮT BUỘC CÓ DÒNG NÀY: Ép Database xóa ngay lập tức trước khi đi tiếp
-        await db.flush() 
+        # 2. CHIẾN THUẬT "DỌN SẠCH": Xóa tất cả record liên quan đến 2 người này
+        # Điều này đảm bảo không còn bất kỳ start_date cũ nào tồn tại
+        await db.execute(
+            delete(CoupleDB).where(
+                (CoupleDB.user1_id == current_user.id) | 
+                (CoupleDB.user2_id == current_user.id) |
+                (CoupleDB.user1_id == partner_id) |
+                (CoupleDB.user2_id == partner_id)
+            )
+        )
+        await db.flush() # Đẩy lệnh xóa xuống DB ngay lập tức
 
-        # 4. Cấp ngay 2 mã ghép đôi "Độc thân" mới tinh cho 2 người
-        my_new_couple = CoupleDB(
-            user1_id=current_user.id,
-            pairing_code=generate_pairing_code() # Tự động gọi hàm tạo mã LVE-...
-        )
-        partner_new_couple = CoupleDB(
-            user1_id=partner_id,
-            pairing_code=generate_pairing_code()
-        )
-        
-        db.add(my_new_couple)
-        db.add(partner_new_couple)
-        
-        # Lưu tất cả thay đổi vào CSDL
+        # 3. Cấp mã Độc thân (FA) mới tinh, start_date bắt buộc là None
+        new_couples = [
+            CoupleDB(user1_id=current_user.id, pairing_code=generate_pairing_code(), start_date=None),
+            CoupleDB(user1_id=partner_id, pairing_code=generate_pairing_code(), start_date=None)
+        ]
+        db.add_all(new_couples)
         await db.commit()
         
     except Exception as e:
         await db.rollback()
-        # In chi tiết lỗi ra màn hình để biết nếu CSDL bị kẹt
-        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi hủy ghép đôi: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi: {str(e)}")
 
-    return {"message": "Đã hủy ghép đôi thành công. Bạn đã trở lại hội độc thân!"}
+    return {"message": "Đã dọn sạch dữ liệu cũ và trở về trạng thái độc thân!"}

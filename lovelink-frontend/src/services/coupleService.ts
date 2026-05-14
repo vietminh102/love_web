@@ -35,6 +35,15 @@ export const coupleService = {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return response.data;
+  },
+  updateStartDate: async (newDate: string) => {
+    const token = localStorage.getItem('token');
+    const response = await apiClient.put(
+      '/couple/start-date', 
+      { new_start_date: newDate }, // VD: "2023-01-01T00:00:00Z"
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    return response.data;
   }
 };
 
