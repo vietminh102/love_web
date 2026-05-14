@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.nosql import connect_to_mongo, close_mongo_connection
 from app.api import auth
-
+from fastapi.staticfiles import StaticFiles
 
 
 @asynccontextmanager
@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], 
@@ -30,3 +30,5 @@ app.include_router(auth.router, prefix="/api")
 @app.get("/")
 async def root():
     return {"message": "Welcome to Lovelink API!"}
+
+# uvicorn app.main:app --reload

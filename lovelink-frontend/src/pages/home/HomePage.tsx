@@ -1,10 +1,13 @@
-import { Heart, Sparkles, Calendar, LogOut, Menu, X, Link as LinkIcon, User, Key, Image as ImageIcon, Copy, Check, Camera, Home, BookHeart, Images, Music, VolumeX } from 'lucide-react';
+import { Heart, Sparkles, Calendar, LogOut, Menu, X, Link as LinkIcon, User, Key, Image as ImageIcon, Copy, Check, Camera, Home, BookHeart, Images, Music, VolumeX, Loader2 } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { authService } from '../../services/authService';
 
 export default function HomePage() {
   const { user, logout } = useAuth();
 
+  const [isUpdating, setIsUpdating] = useState(false); // Trạng thái đang gửi API
+  const [updateError, setUpdateError] = useState('');
   // --- STATES CHO GIAO DIỆN CHÍNH ---
   const [daysInLove, setDaysInLove] = useState(0);
   const [anniversaryDate, setAnniversaryDate] = useState('2024-01-14');
@@ -32,6 +35,7 @@ export default function HomePage() {
     avatarUrl: user?.avatar_url || '',
     avatarFile: null as File | null,
     displayName: user?.display_name || '',
+    oldPassword: '',
     password: ''
   });
 
@@ -159,6 +163,73 @@ const toggleMusic = async () => {
       setEditForm({ ...editForm, avatarUrl: previewUrl, avatarFile: file });
     }
   };
+// Thay doi thong tin ca nhan
+  const handleUpdateProfile = async () => {
+  setUpdateError(''); // Reset lỗi cũ
+  
+  if (!editForm.displayName.trim()) {
+    setUpdateError('Tên hiển thị không được để trống!');
+    return;
+  }
+  if (editForm.password && !editForm.oldPassword) {
+    setUpdateError('Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu mới!');
+    return;
+  }
+
+  setIsUpdating(true); // Bắt đầu hiệu ứng Loading
+
+  try {
+    // Tạo FormData để đóng gói dữ liệu (bao gồm cả file ảnh)
+    const formData = new FormData();
+    formData.append('display_name', editForm.displayName);
+    
+    if (editForm.password) {
+      formData.append('old_password', editForm.oldPassword); 
+      formData.append('password', editForm.password);
+    }
+    
+    if (editForm.avatarFile) {
+      formData.append('avatar', editForm.avatarFile); // File ảnh thật từ máy
+    }
+
+    // GỌI API TẠI ĐÂY (Ví dụ với authService)
+    const response = await authService.updateProfile(formData);
+    
+    // Giả lập chờ đợi Backend xử lý 1.5 giây
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Cập nhật thành công giao diện
+    setPartnerNames(prev => ({...prev, name1: editForm.displayName}));
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const updatedUser = { 
+        ...currentUser, 
+        display_name: response.user.display_name,
+        avatar_url: response.user.avatar_url 
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      setIsEditModalOpen(false);
+      setEditForm(prev => ({ ...prev, password: '', oldPassword: '' }));
+      alert('Đã lưu những thay đổi ngọt ngào! 💕');
+
+    } catch (error: any) {
+      // Lấy chi tiết lỗi từ FastAPI
+      const errorDetail = error.response?.data?.detail;
+
+      if (Array.isArray(errorDetail)) {
+        // Nếu là lỗi 422 (mảng các Object), ta bóc tách để lấy câu thông báo
+        // errorDetail[0].loc chứa nơi gây lỗi (VD: body -> display_name)
+        const fieldError = errorDetail[0].loc[errorDetail[0].loc.length - 1]; 
+        setUpdateError(`Lỗi ở trường dữ liệu: ${fieldError} - ${errorDetail[0].msg}`);
+      } else {
+        // Nếu là các lỗi khác (string)
+        setUpdateError(errorDetail || 'Lỗi kết nối server.');
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+};
 
   return (
     <div className="min-h-screen w-full bg-linear-to-br from-pink-200 via-rose-200 to-red-200 relative overflow-hidden font-sans">
@@ -198,7 +269,7 @@ const toggleMusic = async () => {
           {/* NÚT BẬT/TẮT NHẠC NỀN */}
          <button 
             onClick={(e) => {
-              e.stopPropagation(); // CHẶN: Không cho click này lan ra ngoài màn hình
+              e.stopPropagation();
               toggleMusic();
             }}
             className={`flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full backdrop-blur-md transition-all shadow-sm ${isPlaying ? 'bg-pink-500 text-white animate-pulse' : 'bg-white/50 text-pink-600 hover:bg-white/70'}`}
@@ -322,12 +393,17 @@ const toggleMusic = async () => {
               <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <User className="w-5 h-5 text-pink-500" /> Thay đổi thông tin
               </h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-1.5 hover:bg-pink-100 rounded-full text-gray-500 transition-colors">
+              <button onClick={() => !isUpdating && setIsEditModalOpen(false)} disabled={isUpdating}>
                 <X className="w-5 h-5" />
               </button>
             </div>
             
             <div className="p-6 space-y-5">
+              {updateError && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 text-center font-medium">
+              {updateError}
+              </div>
+              )}
               <div className="flex flex-col items-center justify-center mb-2">
                 <div className="relative group cursor-pointer">
                   <div className="w-24 h-24 rounded-full bg-pink-100 flex items-center justify-center overflow-hidden border-4 border-pink-50 shadow-md">
@@ -343,7 +419,7 @@ const toggleMusic = async () => {
                     <span className="text-white text-[10px] font-bold">Đổi ảnh</span>
                   </label>
                   
-                  <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                  <input id="avatar-upload" disabled={isUpdating} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                 </div>
                 <p className="text-xs text-gray-500 mt-3 text-center">Bấm vào ảnh để chọn từ máy tính</p>
               </div>
@@ -352,23 +428,24 @@ const toggleMusic = async () => {
                 <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 mb-1">
                   <User className="w-4 h-4 text-pink-400"/> Tên hiển thị
                 </label>
-                <input type="text" value={editForm.displayName} onChange={(e) => setEditForm({...editForm, displayName: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" />
+                <input type="text" disabled={isUpdating} value={editForm.displayName} onChange={(e) => setEditForm({...editForm, displayName: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 mb-1">
-                  <Key className="w-4 h-4 text-pink-400"/> Mật khẩu mới
+                  <Key className="w-4 h-4 text-pink-400"/> Đổi mật khẩu
                 </label>
-                <input type="password" placeholder="Bỏ trống nếu không muốn đổi" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700" />
+                <input type="old_password" disabled={isUpdating} placeholder="Nhập mật khẩu của bạn" value={editForm.oldPassword} onChange={(e) => setEditForm({...editForm, oldPassword: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700" />
+                <input type="password" disabled={isUpdating} placeholder="Mật khẩu mới" value={editForm.password} onChange={(e) => setEditForm({...editForm, password: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700" />
               </div>
               <button 
-                onClick={() => {
-                  // TODO: Sau này gọi API Upload file `editForm.avatarFile` ở đây
-                  setPartnerNames(prev => ({...prev, name1: editForm.displayName || prev.name1}));
-                  setIsEditModalOpen(false);
-                }}
+                onClick={handleUpdateProfile}
+                disabled={isUpdating}
                 className="w-full mt-2 py-3 bg-linear-to-r from-pink-400 to-rose-500 hover:from-pink-500 hover:to-rose-600 text-white font-bold rounded-xl shadow-md transform transition-all active:scale-[0.98]"
-              >
-                Lưu thông tin
+              >{isUpdating ? (
+            <><Loader2 className="w-5 h-5 animate-spin" /> Đang lưu...</>
+          ) : (
+            'Lưu thông tin'
+          )}
               </button>
             </div>
           </div>
