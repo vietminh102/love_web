@@ -1,13 +1,33 @@
 import apiClient from './apiClient';
 
 export const authService = {
-  login: async (data: any) => { 
-    const response = await apiClient.post('/auth/login', data);
+  getMe: async () => {
+    const token = localStorage.getItem('token'); // Lấy chìa khóa
+    if (!token) throw new Error("Chưa đăng nhập");
+    
+    const response = await apiClient.get('/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.data;
+  },
+login: async (email: string, password: string) => {
+    // Chỉ cần truyền thẳng 1 Object (JSON) cực kỳ đơn giản
+    const response = await apiClient.post('/auth/login', {
+      email: email, 
+      password: password
+    });
+    
     return response.data;
   },
   
-  register: async (data: any) => {
-    const response = await apiClient.post('/auth/register', data);
+  register: async (userData: { 
+    email: string; 
+    password: string; 
+    name?: string;     // SỬA Ở ĐÂY: Đổi display_name thành name
+    gender?: string; 
+    dob?: string 
+  }) => {
+    const response = await apiClient.post('/auth/register', userData);
     return response.data;
   },
   

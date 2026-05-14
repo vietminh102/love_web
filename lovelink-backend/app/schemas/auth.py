@@ -14,6 +14,8 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, description="Mật khẩu phải từ 6 ký tự")
     name: str = Field(..., min_length=2, max_length=100, description="Tên hiển thị của người dùng") 
+    gender: Optional[str] = "other"
+    dob: Optional[str] = None
 
 class UserLogin(BaseModel):
     """

@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 import jwt # Sử dụng PyJWT đồng bộ với security.py
 
 from app.db.sql import get_db
-from app.models.postgres import UserDB
+from app.models.Users import Users
 from app.core.config import settings  # SỬA: Import settings từ config thay vì security
 
 # Khai báo cấu hình bắt Token từ Header
@@ -33,7 +33,7 @@ async def get_current_user(
         raise credentials_exception
 
     # Truy vấn User từ CSDL
-    result = await db.execute(select(UserDB).where(UserDB.id == user_id))
+    result = await db.execute(select(Users).where(Users.id == user_id))
     user = result.scalars().first()
     
     if user is None:

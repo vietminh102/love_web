@@ -8,6 +8,8 @@ import { coupleService } from '../../services/coupleService';
 export default function HomePage() {
   const { user, logout } = useAuth();
 
+  const [partnerDob, setPartnerDob] = useState<string>('');
+  const [partnerGender, setPartnerGender] = useState<string>('other');
   // Cap doi
   const [pairingCode, setPairingCode] = useState<string>('Đang tải...');
   const [partnerCode, setPartnerCode] = useState('');
@@ -47,6 +49,8 @@ export default function HomePage() {
     avatarUrl: user?.avatar_url || '',
     avatarFile: null as File | null,
     displayName: user?.display_name || '',
+    gender: user?.gender || 'other',
+    dob: user?.dob || '',
     oldPassword: '',
     password: ''
   });
@@ -72,7 +76,8 @@ export default function HomePage() {
         if (data.has_partner) {
           setPartnerNames(prev => ({ ...prev, name2: data.display_name }));
           if (data.avatar_url) setPartnerAvatar(data.avatar_url);
-          
+          if (data.dob) setPartnerDob(data.dob);
+          if (data.gender) setPartnerGender(data.gender);
           // BỔ SUNG: Lấy ngày bắt đầu yêu từ CSDL
           if (data.start_date) {
             setStartDateDB(data.start_date);
@@ -191,7 +196,29 @@ export default function HomePage() {
       document.removeEventListener('keydown', handleUserInteraction);
     };
   }, [isPlaying]); // Chạy lại hiệu ứng này nếu isPlaying thay đổi về false
-
+// Hàm tính tuổi từ chuỗi ngày sinh (YYYY-MM-DD)
+  const getAge = (dobStr?: string) => {
+    if (!dobStr) return ''; // Nếu chưa cài ngày sinh thì không hiển thị gì
+    
+    const birthDate = new Date(dobStr);
+    const today = new Date();
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    
+    // Nếu chưa tới sinh nhật trong năm nay thì trừ đi 1 tuổi
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return `(${age})`; // Trả về chuỗi ví dụ: "(24)"
+  };
+  // Hàm chuyển đổi giới tính thành danh xưng (Chồng/Vợ)
+  const getRoleName = (gender?: string) => {
+    if (gender === 'male') return 'Chồng ';
+    if (gender === 'female') return 'Vợ ';
+    return ''; // Nếu chưa cài đặt giới tính (other) thì không hiện gì cả
+  };
   // Hàm Bật/Tắt nhạc nền bằng tay (giữ nguyên)
 const toggleMusic = async () => {
     if (audioRef.current) {
@@ -341,6 +368,8 @@ useEffect(() => {
     // Tạo FormData để đóng gói dữ liệu (bao gồm cả file ảnh)
     const formData = new FormData();
     formData.append('display_name', editForm.displayName);
+    formData.append('gender', editForm.gender);
+    formData.append('dob', editForm.dob);
     
     if (editForm.password) {
       formData.append('old_password', editForm.oldPassword); 
@@ -364,7 +393,9 @@ useEffect(() => {
       const updatedUser = { 
         ...currentUser, 
         display_name: response.user.display_name,
-        avatar_url: response.user.avatar_url 
+        avatar_url: response.user.avatar_url,
+        gender: response.user.gender,
+        dob: response.user.dob
       };
       localStorage.setItem('user', JSON.stringify(updatedUser));
 
@@ -489,16 +520,42 @@ const handlePairing = async () => {
           <User className="w-6 h-6 text-pink-400" />
         )}
       </div>
-      <div className="flex flex-col min-w-0"> {/* min-w-0 giúp chữ dài không bị tràn */}
-        <span className="font-bold text-gray-800 text-[15px] leading-tight truncate">
-          {partnerNames.name1}
-        </span>
+      <div className="flex flex-col min-w-0 w-full">
+        
+        {/* Tên & Giới tính */}
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-gray-800 text-[15px] leading-tight truncate">
+            {partnerNames.name1}
+          </span>
+          {/* Hiển thị Icon giới tính chuẩn */}
+          {editForm.gender === 'male' && (
+            <span className="text-blue-500 text-lg font-bold leading-none" title="Nam">♂</span>
+          )}
+          {editForm.gender === 'female' && (
+            <span className="text-pink-500 text-lg font-bold leading-none" title="Nữ">♀</span>
+          )}
+        </div>
+
+
+
+        {/* Ngày sinh (Chỉ hiển thị nếu đã cài đặt) */}
+        {editForm.dob && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium mt-1">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">
+              {/* Đảo ngược YYYY-MM-DD thành DD/MM/YYYY cho đúng chuẩn Việt Nam */}
+              {editForm.dob.split('-').reverse().join('/')}
+            </span>
+          </div>
+        )}
+        {/* Trạng thái hẹn hò */}
         <div className="flex items-center gap-1.5 text-xs text-pink-500 font-medium mt-1">
-          <Heart className="w-3.5 h-3.5 fill-pink-500" /> 
+          <Heart className="w-3.5 h-3.5 fill-pink-500 shrink-0" /> 
           <span className="truncate">
             {hasPartner ? `Đang yêu ${partnerNames.name2}` : 'Đang độc thân'}
           </span>
         </div>
+
       </div>
     </div>
 
@@ -678,6 +735,48 @@ const handlePairing = async () => {
                 </label>
                 <input type="text" disabled={isUpdating} value={editForm.displayName} onChange={(e) => setEditForm({...editForm, displayName: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" />
               </div>
+<div className="pt-2">
+                <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 mb-2">
+                  <Heart className="w-4 h-4 text-pink-400"/> Giới tính
+                </label>
+                <div className="flex gap-3">
+                  {/* Nút Nam */}
+                  <label className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${editForm.gender === 'male' ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                    <input type="radio" name="gender" value="male" className="hidden" 
+                      checked={editForm.gender === 'male'} 
+                      onChange={(e) => setEditForm({...editForm, gender: e.target.value})} 
+                    />
+                    <span className="font-bold text-sm flex items-center gap-1">
+                      Nam <span className="text-xl font-black leading-none text-blue-600">♂</span>
+                    </span>
+                  </label>
+
+                  {/* Nút Nữ */}
+                  <label className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all ${editForm.gender === 'female' ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                    <input type="radio" name="gender" value="female" className="hidden" 
+                      checked={editForm.gender === 'female'} 
+                      onChange={(e) => setEditForm({...editForm, gender: e.target.value})} 
+                    />
+                    <span className="font-bold text-sm flex items-center gap-1">
+                      Nữ <span className="text-xl font-black leading-none text-rose-600">♀</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+              {/* BỔ SUNG Ô NHẬP NGÀY SINH */}
+              <div className="pt-2">
+                <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 mb-1">
+                  <Calendar className="w-4 h-4 text-pink-400"/> Ngày sinh
+                </label>
+                <input 
+                  type="date" 
+                  disabled={isUpdating} 
+                  value={editForm.dob} 
+                  onChange={(e) => setEditForm({...editForm, dob: e.target.value})} 
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" 
+                />
+                <p className="text-[10px] text-gray-400 mt-1 ml-1">* Ngày sinh dùng để tính tuổi và thông báo kỷ niệm</p>
+              </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 mb-1">
                   <Key className="w-4 h-4 text-pink-400"/> Đổi mật khẩu
@@ -718,10 +817,45 @@ const handlePairing = async () => {
       {/* Main Content (Đã đẩy xuống bằng pt-28 để không bị Navbar đè lên) */}
       <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-28 pb-12 w-full h-full overflow-y-auto">
         {/* Names */}
-        <div className="text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-linear-to-r from-pink-600 to-rose-600 drop-shadow-sm">
-            {partnerNames.name1} 💕 {partnerNames.name2}
-          </h2>
+        <div className="text-center mt-6 mb-4 z-10 relative">
+          <h1 className="text-3xl sm:text-4xl font-bold text-pink-600 drop-shadow-sm flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+            
+            {/* Tên & Tuổi của Bạn */}
+            <span className="flex items-baseline gap-1.5">
+              {/* Danh xưng: Chồng/Vợ */}
+              <span className="text-xl sm:text-2xl text-pink-500/80 font-semibold tracking-wide">
+                {getRoleName(user?.gender)}
+              </span>
+              {/* Tên chính */}
+              <span>{partnerNames.name1}</span>
+              {/* Tuổi */}
+              <span className="text-lg sm:text-xl text-pink-400 font-medium">
+                {getAge(user?.dob)}
+              </span>
+            </span>
+            
+            {/* Trái tim ở giữa */}
+            <span className="text-rose-500 animate-pulse drop-shadow-md mx-1">💕</span>
+            
+            {/* Tên & Tuổi của Người yêu */}
+            {hasPartner ? (
+              <span className="flex items-baseline gap-1.5">
+                {/* Danh xưng: Chồng/Vợ */}
+                <span className="text-xl sm:text-2xl text-pink-500/80 font-semibold tracking-wide">
+                  {getRoleName(partnerGender)}
+                </span>
+                {/* Tên chính */}
+                <span>{partnerNames.name2}</span>
+                {/* Tuổi */}
+                <span className="text-lg sm:text-xl text-pink-400 font-medium">
+                  {getAge(partnerDob)}
+                </span>
+              </span>
+            ) : (
+              <span className="text-pink-300">Đang tìm...</span>
+            )}
+
+          </h1>
         </div>
 
         {/* Big Heart Container */}

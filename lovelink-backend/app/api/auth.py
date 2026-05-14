@@ -3,7 +3,6 @@ import random
 import string
 from datetime import datetime
 from typing import Optional
-from app.models.postgres import CoupleDB
 from sqlalchemy.future import select
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
@@ -13,7 +12,8 @@ from sqlalchemy.future import select
 # Import từ các module của bạn
 from app.db.sql import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
-from app.models.postgres import UserDB, CoupleDB 
+from app.models.Users import Users
+from app.models.Couples import Couples
 from app.api.deps import get_current_user
 from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse, UpdateResponse
 
@@ -28,20 +28,37 @@ def generate_pairing_code(length=8):
     """Sinh mã ghép đôi ngẫu nhiên"""
     chars = string.ascii_uppercase + string.digits
     return "VYL-" + "".join(random.choices(chars, k=length-4))
-
+@router.get("/me")
+async def get_current_user_info(current_user: Users = Depends(get_current_user)):
+    """API để Frontend tự động kéo thông tin mới nhất mỗi khi load web"""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "display_name": current_user.display_name,
+        "avatar_url": current_user.avatar_url,
+        "gender": current_user.gender,
+        "dob": current_user.dob.isoformat() if current_user.dob else None
+    }
 @router.post("/register", response_model=Token)
 async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     # 1. Kiểm tra Email
-    result = await db.execute(select(UserDB).where(UserDB.email == user_data.email))
+    result = await db.execute(select(Users).where(Users.email == user_data.email))
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="Email này đã được đăng ký!")
-
+    parsed_dob = None
+    if user_data.dob:
+        try:
+            parsed_dob = datetime.strptime(user_data.dob, "%Y-%m-%d").date()
+        except ValueError:
+            pass # Hoặc báo lỗi tùy bạn
     # 2. Tạo User
     hashed_password = get_password_hash(user_data.password)
-    new_user = UserDB(
+    new_user = Users(
         email=user_data.email,
         password_hash=hashed_password,
-        display_name=user_data.name
+        display_name=user_data.name,
+        gender=user_data.gender,
+        dob=parsed_dob
     )
     db.add(new_user)
     await db.flush() # Lưu tạm vào DB để sinh ra ID
@@ -54,7 +71,7 @@ async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_
     user_created_at = new_user.created_at
 
     # 3. Tạo Couple
-    new_couple = CoupleDB(
+    new_couple = Couples(
         user1_id=user_id,
         pairing_code=generate_pairing_code()
     )
@@ -80,7 +97,7 @@ async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_
 
 @router.post("/login", response_model=Token)
 async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(UserDB).where(UserDB.email == user_data.email))
+    result = await db.execute(select(Users).where(Users.email == user_data.email))
     user = result.scalars().first()
 
     if not user or not verify_password(user_data.password, user.password_hash):
@@ -107,17 +124,24 @@ async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
 @router.put("/update-profile", response_model=UpdateResponse)
 async def update_profile(
     display_name: Optional[str] = Form(None),
+    gender: str = Form("other"),
+    dob: str = Form(None),
     old_password: Optional[str] = Form(None),
     password: str = Form(None),
     avatar: UploadFile = File(None),
-    current_user: UserDB = Depends(get_current_user),
+    current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     # 1. Cập nhật Tên hiển thị (Kiểm tra rỗng)
     if not display_name.strip():
         raise HTTPException(status_code=400, detail="Tên hiển thị không được để trống")
     current_user.display_name = display_name.strip()
-
+    current_user.gender = gender
+    if dob:
+        try:
+            current_user.dob = datetime.strptime(dob, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Sai định dạng ngày sinh")
     # 2. Xử lý đổi mật khẩu
     if password:
         if len(password) < 6:
@@ -170,15 +194,15 @@ async def update_profile(
     }
 @router.delete("/delete-account")
 async def delete_account(
-    current_user: UserDB = Depends(get_current_user),
+    current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Xóa tài khoản vĩnh viễn (Yêu cầu phải đang độc thân)"""
     
     # 1. Kiểm tra trạng thái ghép đôi
     result = await db.execute(
-        select(CoupleDB).where(
-            (CoupleDB.user1_id == current_user.id) | (CoupleDB.user2_id == current_user.id)
+        select(Couples).where(
+            (Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id)
         )
     )
     couple = result.scalars().first()
