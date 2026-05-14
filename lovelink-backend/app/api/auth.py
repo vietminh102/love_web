@@ -3,6 +3,8 @@ import random
 import string
 from datetime import datetime
 from typing import Optional
+from app.models.postgres import CoupleDB
+from sqlalchemy.future import select
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +27,7 @@ if not os.path.exists(UPLOAD_DIR):
 def generate_pairing_code(length=8):
     """Sinh mã ghép đôi ngẫu nhiên"""
     chars = string.ascii_uppercase + string.digits
-    return "LVE-" + "".join(random.choices(chars, k=length-4))
+    return "VYL-" + "".join(random.choices(chars, k=length-4))
 
 @router.post("/register", response_model=Token)
 async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
@@ -166,3 +168,39 @@ async def update_profile(
         "message": "Cập nhật thông tin thành công! 💕",
         "user": current_user
     }
+@router.delete("/delete-account")
+async def delete_account(
+    current_user: UserDB = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Xóa tài khoản vĩnh viễn (Yêu cầu phải đang độc thân)"""
+    
+    # 1. Kiểm tra trạng thái ghép đôi
+    result = await db.execute(
+        select(CoupleDB).where(
+            (CoupleDB.user1_id == current_user.id) | (CoupleDB.user2_id == current_user.id)
+        )
+    )
+    couple = result.scalars().first()
+
+    # 2. Chặn nếu đang ghép đôi (user2_id có dữ liệu)
+    if couple and couple.user1_id is not None and couple.user2_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bạn phải hủy ghép đôi trước khi có thể xóa tài khoản!"
+        )
+
+    try:
+        # 3. Xóa bản ghi chứa mã ghép đôi FA của người này (nếu có)
+        if couple:
+            await db.delete(couple)
+        
+        # 4. Xóa tài khoản chính
+        await db.delete(current_user)
+        await db.commit()
+        
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi xóa tài khoản: {str(e)}")
+
+    return {"message": "Tài khoản của bạn đã được xóa vĩnh viễn."}

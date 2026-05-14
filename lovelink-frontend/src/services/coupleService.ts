@@ -1,0 +1,41 @@
+// file: src/services/coupleService.ts
+import apiClient from './apiClient';
+
+export const coupleService = {
+  getMyCode: async () => {
+    const token = localStorage.getItem('token');
+    const response = await apiClient.get('/couple/info', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data; 
+  },
+  pairWithPartner: async (pairingCode: string) => {
+    const token = localStorage.getItem('token');
+    const response = await apiClient.post(
+      '/couple/pair', 
+      { pairing_code: pairingCode }, // Gửi body dạng JSON
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+    return response.data;
+  },
+  getPartnerInfo: async () => {
+    const token = localStorage.getItem('token');
+    const response = await apiClient.get('/couple/partner', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.data;
+  },
+  unpair: async () => {
+    const token = localStorage.getItem('token');
+    const response = await apiClient.post('/couple/unpair', {}, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.data;
+  }
+};
+
+

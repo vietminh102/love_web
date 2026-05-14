@@ -22,5 +22,13 @@ export const authService = {
       }
     });
     return response.data;
+  },
+  deleteAccount: async () => {
+    const token = localStorage.getItem('token');
+    // Dùng phương thức DELETE cho chuẩn RESTful API
+    const response = await apiClient.delete('/auth/delete-account', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.data;
   }
 };
