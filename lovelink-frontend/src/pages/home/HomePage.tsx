@@ -1,5 +1,5 @@
-import { Heart, Sparkles, Calendar } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import { Heart, Sparkles, Calendar, Camera, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { coupleService } from '../../services/coupleService';
 
@@ -16,19 +16,17 @@ export default function HomePage() {
   const [editDateInput, setEditDateInput] = useState(''); 
   const [isEditingDate, setIsEditingDate] = useState(false);
   
+  // Backgroud
+  const [bgImage, setBgImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [partnerNames, setPartnerNames] = useState({ 
     name1: user?.display_name || 'Bạn', 
     name2: 'Đang tải...'
   });
 
-  // Cập nhật tên khi load
-  useEffect(() => {
-    if (user) {
-      setPartnerNames(prev => ({ ...prev, name1: user.display_name || 'Bạn' }));
-    }
-  }, [user]);
+  // --- ĐÃ XÓA USE_EFFECT LOCALSTORAGE CŨ BỊ XUNG ĐỘT Ở ĐÂY ---
 
-  // Lấy thông tin đối phương từ API
+  // Lấy thông tin đối phương từ API (Đã gộp xử lý background vào đây)
   useEffect(() => {
     if (!user) return;
     const fetchPartner = async () => {
@@ -41,6 +39,13 @@ export default function HomePage() {
           if (data.dob) setPartnerDob(data.dob);
           if (data.gender) setPartnerGender(data.gender);
           
+          // SỬA LOGIC Ở ĐÂY: Ưu tiên dùng ảnh nền từ Database trả về
+          if (data.background_url) {
+            setBgImage(data.background_url);
+          } else {
+            setBgImage(null); // Nếu DB không có ảnh thì set về null
+          }
+
           if (data.start_date) {
             setStartDateDB(data.start_date);
             const dateObj = new Date(data.start_date);
@@ -50,6 +55,7 @@ export default function HomePage() {
           }
         } else {
           setPartnerNames(prev => ({ ...prev, name2: '(Chưa ghép đôi)' }));
+          setBgImage(null); // SỬA LOGIC Ở ĐÂY: Nếu độc thân thì xóa sạch ảnh nền
         }
       } catch (error) {
         console.error("Lỗi khi tải thông tin đối phương:", error);
@@ -81,6 +87,44 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [hasPartner, startDateDB]);
 
+  // Xử lý upload ảnh
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && hasPartner) {
+      try {
+        // MẸO UX: Cho hiển thị tạm ảnh lên màn hình ngay lập tức để cảm giác mượt mà
+        const tempUrl = URL.createObjectURL(file);
+        setBgImage(tempUrl); 
+        
+        // GỌI API GỬI FILE LÊN MONGODB/POSTGRESQL
+        const res = await coupleService.uploadBackground(file);
+        
+        // Thành công thì dùng ảnh xịn từ server
+        setBgImage(res.background_url); 
+      } catch (error) {
+        console.error("Lỗi up ảnh nền", error);
+        alert("Có lỗi xảy ra khi tải ảnh lên!");
+        setBgImage(null); // Nếu lỗi thì gỡ ảnh tạm đi
+      }
+    }
+  };
+
+  // Xóa ảnh nền
+  const handleRemoveBg = async () => {
+    if (!hasPartner) return;
+    
+    // Cảnh báo người dùng trước khi xóa vì sẽ ảnh hưởng tới cả 2 người
+    if (!window.confirm("Bạn có chắc chắn muốn xóa ảnh nền của cả hai không?")) return;
+
+    try {
+      await coupleService.removeBackground();
+      setBgImage(null); // Xóa trên màn hình
+    } catch (error) {
+      console.error("Lỗi xóa ảnh", error);
+      alert("Không thể xóa ảnh nền lúc này.");
+    }
+  };
+  
   // Lưu ngày bắt đầu yêu
   const handleSaveDate = async () => {
     try {
@@ -116,8 +160,19 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-linear-to-br from-pink-200 via-rose-200 to-red-200 relative overflow-hidden font-sans">
-      
+    <div className="min-h-screen w-full  via-rose-200 to-red-200 relative overflow-hidden font-sans">
+      <div 
+        className="absolute inset-0 z-0 transition-all duration-700 bg-contain bg-center bg-no-repeat bg-pink-100"
+        style={(bgImage && hasPartner) ? { backgroundImage: `url(${bgImage})` } : {}}
+      >
+        {!(bgImage && hasPartner) && (
+          <div className="absolute inset-0 bg-linear-to-br from-pink-200 via-rose-200 to-red-200" />
+        )}
+      </div>
+
+      {(bgImage && hasPartner) && (
+        <div className="absolute inset-0 z-0 bg-pink-950/20 backdrop-blur-[2px]" />
+      )}
       {/* Animated Background Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
@@ -131,9 +186,35 @@ export default function HomePage() {
           </div>
         ))}
       </div>
-
+      {hasPartner && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+          {bgImage && (
+            <button 
+              onClick={handleRemoveBg}
+              className="w-12 h-12 flex items-center justify-center bg-white/80 backdrop-blur-md text-red-500 rounded-full shadow-lg hover:bg-white transition-all hover:scale-110"
+              title="Xóa ảnh nền"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-12 h-12 flex items-center justify-center bg-white/80 backdrop-blur-md text-pink-500 rounded-full shadow-lg hover:bg-white transition-all hover:scale-110"
+            title="Đổi ảnh nền"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleBgUpload} 
+          />
+        </div>
+      )}
       {/* Main Content (Đã đẩy xuống bằng pt-28 để không bị Navbar đè lên) */}
-      <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-28 pb-12 w-full h-full overflow-y-auto">
+      <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-28 pb-24 w-full h-full overflow-y-auto">
         
         {/* Names */}
         <div className="text-center mt-6 mb-4 z-10 relative">

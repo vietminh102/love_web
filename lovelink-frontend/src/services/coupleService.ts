@@ -44,7 +44,25 @@ export const coupleService = {
       { headers: { 'Authorization': `Bearer ${token}` } }
     );
     return response.data;
-  }
+  },
+  // Upload ảnh nền Couple
+  uploadBackground: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await apiClient.post('/couple/background', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Xóa ảnh nền
+  removeBackground: async () => {
+    const response = await apiClient.delete('/couple/background');
+    return response.data;
+  },
 };
 
 

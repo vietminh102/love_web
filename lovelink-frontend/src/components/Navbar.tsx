@@ -233,7 +233,7 @@ export function Navbar() {
           
           <div className="flex items-center gap-2 pl-2">
             <Heart className="w-6 h-6 text-pink-500 fill-pink-500" />
-            <span className="hidden sm:inline text-xl font-black text-pink-600 tracking-tight font-serif drop-shadow-sm">Lovelink</span>
+            <span className="hidden sm:inline text-xl font-black text-pink-600 tracking-tight font-serif drop-shadow-sm">LoveLe</span>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
