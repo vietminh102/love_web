@@ -5,71 +5,73 @@ import { authService } from '../services/authService';
 interface User {
   id: string;
   email: string;
-  display_name: string; // <-- Quan trọng: Phải là display_name
+  display_name: string; 
   avatar_url?: string | null;
-  gender?: string;     // Giới tính: 'male', 'female', 'other'
-  dob?: string;        // Ngày sinh: 'YYYY-MM-DD'
+  gender?: string;     
+  dob?: string;        
 }
 
+// 1. THÊM isLoading VÀO ĐÂY
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean; 
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-useEffect(() => {
-    const fetchFreshData = async () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  // GỘP 2 USEEFFECT LẠI THÀNH 1 LUỒNG CHUẨN XÁC
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setIsLoading(true); // Bắt đầu load
+
       const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+
+      // Phản hồi siêu tốc: Nếu có user trong máy, cho vào dùng luôn để khỏi chờ
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (error) {
+          console.error("Lỗi đọc dữ liệu user:", error);
+        }
+      }
+
+      // Xác thực lại với server ngầm bên dưới
       if (token) {
         try {
-          // Gọi Backend xin thông tin mới nhất
           const freshUserData = await authService.getMe(); 
-          
-          // Ghi đè vào State và LocalStorage
           setUser(freshUserData);
           localStorage.setItem('user', JSON.stringify(freshUserData));
         } catch (error) {
-          // Nếu Token hết hạn hoặc lỗi, cho văng ra ngoài
           console.error("Phiên đăng nhập hết hạn");
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           setUser(null);
         }
       }
+      
+      setIsLoading(false); // 2. BÁO HIỆU TẢI XONG
     };
 
-    fetchFreshData();
-  }, []);
-  // Kiểm tra localStorage khi người dùng F5 tải lại trang
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (token && savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error("Lỗi đọc dữ liệu user:", error);
-      }
-    }
+    initializeAuth();
   }, []);
 
-const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      // 1. Truyền thẳng 2 biến xuống cho Service tự lo liệu
       const response = await authService.login(email, password); 
       
       const token = response.access_token;
       localStorage.setItem('token', token);
 
-      // 2. Lấy thông tin user
       const freshUserData = await authService.getMe();
 
-      // 3. Cập nhật state
       setUser(freshUserData);
       localStorage.setItem('user', JSON.stringify(freshUserData));
 
@@ -90,7 +92,8 @@ const login = async (email: string, password: string) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    // 3. TRUYỀN isLoading RA NGOÀI ĐỂ APP.TSX DÙNG
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

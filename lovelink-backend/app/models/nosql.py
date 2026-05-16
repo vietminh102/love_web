@@ -3,6 +3,7 @@ from beanie import Document
 from pydantic import Field
 from typing import Optional
 from datetime import datetime
+from typing import List
 
 class Diary(Document):
     title: str
@@ -14,7 +15,9 @@ class Diary(Document):
     # Tự động lấy thời gian tạo
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # couple_id: str  <-- Sau này bạn sẽ dùng trường này để biết nhật ký này của cặp đôi nào
+    author_id: str  
+    visibility: str = "couple"
+    liked_by: List[str] = []
 
     class Settings:
         name = "diaries"  # Tên Collection trong MongoDB
