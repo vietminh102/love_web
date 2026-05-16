@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, CalendarHeart, PenLine, Quote, X, ImagePlus, MapPin, Type, Calendar as CalendarIcon, Save } from 'lucide-react';
 import apiClient from '../../services/apiClient';
@@ -18,7 +19,7 @@ interface DiaryEntry {
 export function DiaryPage() {
   const [isWriting, setIsWriting] = useState(false);
   const [entries, setEntries] = useState<any[]>([]);
-
+  
   // 2. Hàm tải dữ liệu
   const fetchDiaries = async () => {
     try {
@@ -110,8 +111,8 @@ function WriteDiaryModal({ onClose, onSave }: { onClose: () => void, onSave: (en
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [location, setLocation] = useState('');
   const [content, setContent] = useState('');
-const [imageFile, setImageFile] = useState<File | null>(null); // Lưu file thật
-const [previewUrl, setPreviewUrl] = useState<string>('');      // Lưu link xem trước
+const [imageFile, setImageFile] = useState<File | null>(null); 
+const [previewUrl, setPreviewUrl] = useState<string>('');      
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -328,6 +329,8 @@ const [previewUrl, setPreviewUrl] = useState<string>('');      // Lưu link xem 
 function DiaryEntryCard({ entry, index }: { entry: DiaryEntry; index: number }) {
   const [isLiked, setIsLiked] = useState(false);
   const [showHearts, setShowHearts] = useState(false);
+  // STATE QUẢN LÝ ẢNH PHÓNG TO
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const handleLike = () => {
     if (!isLiked) {
@@ -376,7 +379,9 @@ function DiaryEntryCard({ entry, index }: { entry: DiaryEntry; index: number }) 
           )}
 
           {entry.image_url && (
-            <div className="w-full h-48 rounded-2xl overflow-hidden mb-4 relative">
+            <div className="w-full h-55  rounded-2xl overflow-hidden mb-4 relative cursor-pointer"
+            onClick={() => setSelectedImage(entry.image_url ?? null)} >
+              
               <img 
                 src={entry.image_url} 
                 alt={entry.title} 
@@ -411,6 +416,35 @@ function DiaryEntryCard({ entry, index }: { entry: DiaryEntry; index: number }) 
           </div>
         </div>
       </div>
+      {/* --- MODAL XEM ẢNH PHÓNG TO  --- */}
+      {selectedImage && createPortal(
+        <div 
+          // Cho luôn zIndex siêu to khổng lồ vào style cho chắc cú
+          style={{ zIndex: 999999 }}
+          className="fixed inset-0 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
+          onClick={() => setSelectedImage(null)} 
+        >
+          {/* Nút X để đóng */}
+          <button 
+            className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors z-[100000]"
+            onClick={(e) => {
+              e.stopPropagation(); 
+              setSelectedImage(null);
+            }}
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Bức ảnh được phóng to */}
+          <img 
+            src={selectedImage} 
+            alt="Phóng to" 
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>,
+        document.body 
+      )}
     </motion.div>
   );
 }
