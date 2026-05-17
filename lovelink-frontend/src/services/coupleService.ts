@@ -3,13 +3,21 @@ import apiClient from './apiClient';
 
 export const coupleService = {
   getMyCode: async () => {
-    const token = localStorage.getItem('token');
+    try{
+      const token = localStorage.getItem('token');
     const response = await apiClient.get('/couple/info', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
     return response.data; 
+    }catch (error: any) {
+
+      if (error.response && error.response.status === 404) {
+        return null; 
+      }
+      throw error; 
+    }
   },
   pairWithPartner: async (pairingCode: string) => {
     const token = localStorage.getItem('token');

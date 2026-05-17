@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Heart, Mail, Lock, User, Sparkles,Calendar } from 'lucide-react'; 
 import React, { useState } from 'react';
 import { authService } from '../../services/authService';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+
 
 // 1. Định nghĩa kiểu dữ liệu cho Form
 interface AuthFormData {
@@ -16,6 +18,7 @@ interface AuthFormData {
 function AuthPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { loginWithGoogle } = useAuth();
   
   const [isLogin, setIsLogin] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
@@ -28,7 +31,32 @@ function AuthPage() {
     gender: 'other', 
     dob: ''
   });
-
+const handleGoogleSuccess = async (credentialResponse: any) => {
+  try {
+    const response = await authService.googleLogin(credentialResponse.credential);
+    
+    if (response.access_token) {
+      // 🌟 BƯỚC QUAN TRỌNG: Phải cất token vào két localStorage NGAY LẬP TỨC
+      // để hàm getMe() ở dưới có "chìa khóa" mang đi gọi API
+      localStorage.setItem('token', response.access_token);
+      
+      // Giờ thì gọi getMe thoải mái, không lo bị chốt chặn báo "Chưa đăng nhập" nữa
+      const freshUserData = await authService.getMe();
+      
+      // Cập nhật trạng thái vào Context để đồng bộ giao diện
+      loginWithGoogle(response.access_token, freshUserData);
+      
+      // Kiểm tra thông tin để điều hướng
+      if (!freshUserData.dob || !freshUserData.gender) {
+        window.location.href = '/onboarding';
+      } else {
+        window.location.href = '/home';
+      }
+    }
+  } catch (error) {
+    console.error("Lỗi đăng nhập Google:", error);
+  }
+};
   // 3. Hàm xử lý submit chuẩn xác
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +149,7 @@ function AuthPage() {
               {error}
             </div>
           )}
+ 
 
 <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
@@ -182,14 +211,14 @@ function AuthPage() {
 
             {/* Email & Mật khẩu dùng chung cho cả Đăng nhập/Đăng ký */}
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
+              <label className="block mb-2 text-sm font-medium text-gray-700">Tên đăng nhập</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-pink-400" />
                 <input
-                  type="email"
+                  type="text"
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  placeholder="email@example.com"
+                  placeholder="Nhập email hoặc tên đăng nhập"
                   className="w-full pl-12 pr-4 py-3 bg-pink-50/50 border border-pink-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all"
                   required
                 />
@@ -222,6 +251,29 @@ function AuthPage() {
               )}
             </button>
           </form>
+                   <GoogleOAuthProvider clientId="337450123524-tuj4ps93vtb43nd79joar6rnj8rrue4u.apps.googleusercontent.com">
+  
+  <div className="mt-6 mb-6">
+    <div className="relative">
+      <div className="absolute inset-0 flex items-center">
+        <div className="w-full border-t border-pink-200"></div>
+      </div>
+      <div className="relative flex justify-center text-sm">
+        <span className="px-2 bg-pink-50 text-gray-500">Hoặc tiếp tục với</span>
+      </div>
+    </div>
+
+    {/* Nút Đăng nhập Google siêu đẹp tự động sinh ra */}
+    <div className="mt-6 flex justify-center">
+      <GoogleLogin
+        onSuccess={handleGoogleSuccess}
+        onError={() => console.log('Đăng nhập Google thất bại')}
+        useOneTap // Hiển thị popup góc phải màn hình rất tiện
+      />
+    </div>
+  </div>
+
+</GoogleOAuthProvider>
           
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500 italic">
@@ -231,7 +283,10 @@ function AuthPage() {
         </div>
       </div>
     </div>
+
+    
   );
+  
 }
 
 export default AuthPage;

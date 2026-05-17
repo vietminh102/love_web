@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 
-// Định nghĩa kiểu dữ liệu khớp với Backend trả về
 interface User {
   id: string;
   email: string;
@@ -11,10 +10,10 @@ interface User {
   dob?: string;        
 }
 
-// 1. THÊM isLoading VÀO ĐÂY
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  loginWithGoogle: (token: string, userData: User) => void; // 🌟 THÊM HÀM NÀY
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean; 
@@ -26,24 +25,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // GỘP 2 USEEFFECT LẠI THÀNH 1 LUỒNG CHUẨN XÁC
   useEffect(() => {
     const initializeAuth = async () => {
-      setIsLoading(true); // Bắt đầu load
-
+      setIsLoading(true);
       const token = localStorage.getItem('token');
       const savedUser = localStorage.getItem('user');
 
-      // Phản hồi siêu tốc: Nếu có user trong máy, cho vào dùng luôn để khỏi chờ
-      if (savedUser) {
+      if (savedUser && savedUser !== 'undefined') {
         try {
           setUser(JSON.parse(savedUser));
         } catch (error) {
           console.error("Lỗi đọc dữ liệu user:", error);
+          localStorage.removeItem('user');
         }
       }
 
-      // Xác thực lại với server ngầm bên dưới
       if (token) {
         try {
           const freshUserData = await authService.getMe(); 
@@ -56,8 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
         }
       }
-      
-      setIsLoading(false); // 2. BÁO HIỆU TẢI XONG
+      setIsLoading(false);
     };
 
     initializeAuth();
@@ -66,23 +61,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       const response = await authService.login(email, password); 
-      
-      const token = response.access_token;
-      localStorage.setItem('token', token);
-
+      localStorage.setItem('token', response.access_token);
       const freshUserData = await authService.getMe();
 
       setUser(freshUserData);
       localStorage.setItem('user', JSON.stringify(freshUserData));
-
       return { success: true };
     } catch (error: any) {
-      console.error("Lỗi đăng nhập:", error);
       return { 
         success: false, 
         message: error.response?.data?.detail || "Email hoặc mật khẩu không đúng" 
       };
     }
+  };
+
+  // 🌟 THÊM HÀM XỬ LÝ GOOGLE ĐỂ ĐỒNG BỘ STATE LẬP TỨC
+  const loginWithGoogle = (token: string, userData: User) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData); // Kích hoạt trạng thái đăng nhập ngay lập tức trong React
   };
 
   const logout = () => {
@@ -92,8 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    // 3. TRUYỀN isLoading RA NGOÀI ĐỂ APP.TSX DÙNG
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
+    <AuthContext.Provider value={{ user, login, loginWithGoogle, logout, isAuthenticated: !!user, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -4,10 +4,14 @@ import string
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.future import select
-
+from pydantic import BaseModel
+from google.oauth2 import id_token
+from google.auth.transport import requests
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from datetime import date
+
 
 # Import từ các module của bạn
 from app.db.sql import get_db
@@ -28,6 +32,15 @@ def generate_pairing_code(length=8):
     """Sinh mã ghép đôi ngẫu nhiên"""
     chars = string.ascii_uppercase + string.digits
     return "VYL-" + "".join(random.choices(chars, k=length-4))
+class OnboardingUpdate(BaseModel):
+    display_name: str
+    gender: str
+    dob: date # Định dạng dạng: YYYY-MM-DD
+# Khai báo schema nhận Token từ Frontend
+class GoogleToken(BaseModel):
+    token: str
+
+GOOGLE_CLIENT_ID = "337450123524-tuj4ps93vtb43nd79joar6rnj8rrue4u.apps.googleusercontent.com"
 @router.get("/me")
 async def get_current_user_info(current_user: Users = Depends(get_current_user)):
     """API để Frontend tự động kéo thông tin mới nhất mỗi khi load web"""
@@ -39,6 +52,76 @@ async def get_current_user_info(current_user: Users = Depends(get_current_user))
         "gender": current_user.gender,
         "dob": current_user.dob.isoformat() if current_user.dob else None
     }
+@router.put("/update-onboarding")
+async def update_onboarding(
+    data: OnboardingUpdate, 
+    db: AsyncSession = Depends(get_db), 
+    current_user: Users = Depends(get_current_user)
+):
+    # Kiểm tra không cho phép để tên trống
+    if not data.display_name.strip():
+        raise HTTPException(status_code=400, detail="Tên hiển thị không được để trống")
+        
+    # Cập nhật thông tin vào tài khoản hiện tại
+    current_user.display_name = data.display_name.strip()
+    current_user.gender = data.gender
+    current_user.dob = data.dob
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return {"success": True, "message": "Cập nhật hồ sơ thành công", "user": current_user}
+@router.post("/google-login")
+async def google_login(data: GoogleToken, db: AsyncSession = Depends(get_db)):
+    try:
+        # 1. Xác thực Token với server của Google
+        idinfo = id_token.verify_oauth2_token(
+            data.token, 
+            requests.Request(), 
+            GOOGLE_CLIENT_ID
+        )
+
+        # 2. Lấy thông tin user từ Google
+        user_email = idinfo['email']
+        user_name = idinfo.get('name', 'Google User')
+        avatar_url = idinfo.get('picture', None)
+
+        # 3. Kiểm tra xem user này đã có trong Database chưa
+        result = await db.execute(select(Users).where(Users.email == user_email))
+        user = result.scalars().first()
+
+        if not user:
+            # 4. Nếu chưa có -> Tự động tạo tài khoản mới (Đăng ký ngầm)
+            new_user = Users(
+                email=user_email,
+                display_name=user_name,
+                avatar_url=avatar_url,
+                password_hash="GOOGLE_ACCOUNT", # Đánh dấu nick Google
+            )
+            db.add(new_user)
+            
+            
+            await db.flush() 
+
+    
+            new_couple = Couples(
+                user1_id=new_user.id,
+                pairing_code=generate_pairing_code() # Sinh mã VYL-XXXX
+            )
+            db.add(new_couple)
+            
+            # Commit lưu cả User và Couple chính thức vào Database
+            await db.commit()
+            await db.refresh(new_user)
+            user = new_user
+
+        # 5. Cấp Access Token của App
+        access_token = create_access_token(data={"sub": str(user.id)})
+
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Xác thực Google thất bại")
 @router.post("/register", response_model=Token)
 async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     # 1. Kiểm tra Email
@@ -228,3 +311,38 @@ async def delete_account(
         raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi xóa tài khoản: {str(e)}")
 
     return {"message": "Tài khoản của bạn đã được xóa vĩnh viễn."}
+@router.post("/update-avatar")
+async def update_user_avatar(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Users = Depends(get_current_user)
+):
+    """API riêng biệt để xử lý upload ảnh từ màn hình Onboarding"""
+    
+    # 1. Kiểm tra định dạng ảnh
+    ext = file.filename.split(".")[-1].lower()
+    if ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
+        raise HTTPException(status_code=400, detail="Định dạng ảnh không hợp lệ")
+
+    # 2. Đặt tên file theo ID để tránh trùng lặp
+    file_name = f"user_{current_user.id}.{ext}"
+    file_path = os.path.join(UPLOAD_DIR, file_name)
+
+    try:
+        # 3. Đọc và lưu file bất đồng bộ
+        content = await file.read() 
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        # 4. Lưu đường dẫn vào user object
+        current_user.avatar_url = f"http://localhost:8000/static/avatars/{file_name}"
+        
+        # 5. Lưu vào Database
+        await db.commit()
+        await db.refresh(current_user)
+        
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu ảnh: {str(e)}")
+
+    return {"success": True, "avatar_url": current_user.avatar_url, "user": current_user}

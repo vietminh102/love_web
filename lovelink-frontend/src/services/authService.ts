@@ -23,14 +23,44 @@ login: async (email: string, password: string) => {
   register: async (userData: { 
     email: string; 
     password: string; 
-    name?: string;     // SỬA Ở ĐÂY: Đổi display_name thành name
+    name?: string;     
     gender?: string; 
     dob?: string 
   }) => {
     const response = await apiClient.post('/auth/register', userData);
     return response.data;
   },
+  googleLogin: async (token: string) => {
+    // Gọi API lên Backend kèm theo mã token của Google
+    const response = await apiClient.post('/auth/google-login', { token });
+    return response.data;
+  },
+updateOnboarding: async (data: { display_name: string; gender: string; dob: string }) => {
+    // Lấy token từ két sắt ra
+    const token = localStorage.getItem('token'); 
+    
+    const response = await apiClient.put('/auth/update-onboarding', data, {
+      headers: {
+        'Authorization': `Bearer ${token}` 
+      }
+    });
+    return response.data;
+  },
+
   
+  uploadAvatar: async (file: File) => {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiClient.post('/auth/update-avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}` 
+      },
+    });
+    return response.data;
+  },
   updateProfile: async (formData: FormData) => {
     // Lấy token từ localStorage
     const token = localStorage.getItem('token'); 

@@ -11,7 +11,7 @@ class UserRegister(BaseModel):
     """
     Schema nhận dữ liệu khi người dùng submit form Đăng ký.
     """
-    email: EmailStr
+    email: str
     password: str = Field(..., min_length=6, description="Mật khẩu phải từ 6 ký tự")
     name: str = Field(..., min_length=2, max_length=100, description="Tên hiển thị của người dùng") 
     gender: Optional[str] = "other"
@@ -21,7 +21,7 @@ class UserLogin(BaseModel):
     """
     Schema nhận dữ liệu khi người dùng submit form Đăng nhập.
     """
-    email: EmailStr
+    email: str
     password: str
 
 # =====================================================================
@@ -34,7 +34,7 @@ class UserResponse(BaseModel):
     Tuyệt đối KHÔNG chứa các trường nhạy cảm như password_hash.
     """
     id: UUID
-    email: EmailStr
+    email: str
     display_name: str
     avatar_url: Optional[str] = None
     created_at: datetime

@@ -35,7 +35,8 @@ async def get_couple_info(
     couple = result.scalars().first()
     
     if not couple:
-        raise HTTPException(status_code=404, detail="Không tìm thấy thông tin ghép đôi")
+    
+        return None
         
     return couple
 

@@ -5,6 +5,7 @@ import HomePage from './pages/home/HomePage';
 import DiaryPage from './pages/diary/DiaryPage';
 import GalleryPage from './pages/gallery/GalleryPage';
 import { FloatingHearts } from './pages/FloatingHearts';
+import OnboardingPage from './pages/OnboardingPage';
 import { Navbar } from './components/Navbar';
 
 // 1. Chốt chặn 1: Dành cho trang nội bộ (Phải đăng nhập)
@@ -61,12 +62,14 @@ function App() {
         <Routes>
           {/* VÙNG 1: TRANG AUTH (Không Navbar, không tim bay) */}
           <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
 
           {/* VÙNG 2: CÁC TRANG NỘI BỘ (Được bọc bởi PrivateRoute và AppLayout) */}
           <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
             <Route path="/home" element={<HomePage />} />
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
+            
           </Route>
 
           {/* Xử lý đi lạc: Gõ link bậy tự động đá về Home */}
