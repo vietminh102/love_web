@@ -23,10 +23,12 @@ class Diary(Document):
         name = "diaries"  # Tên Collection trong MongoDB
 
 class Gallery(Document):
+    
+    user_id: str
+    couple_id: Optional[str] = None # Cho phép null nếu user đang độc thân
     image_url: str
-    caption: Optional[str] = None
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
-    # couple_id: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    likes: List[str] = Field(default_factory=list)
 
     class Settings:
         name = "galleries"
