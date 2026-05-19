@@ -4,6 +4,7 @@ import { Heart, Home, BookOpen, Image as ImageIcon, Music, VolumeX, Menu, LogOut
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import { coupleService } from '../services/coupleService';
+import NotificationBell from './NotificationBell';
 
 export function Navbar() {
   const location = useLocation();
@@ -262,6 +263,8 @@ export function Navbar() {
             >
               {isPlaying ? <Music className="w-4 h-4 sm:w-5 sm:h-5" /> : <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
+            {/* 🌟 2. GẮN CỤC CHUÔNG VÀO ĐÂY */}
+            <NotificationBell />
 
             <div className="relative">
               <button 

@@ -9,7 +9,9 @@ from app.db.sql import get_db
 from app.api.deps import get_current_user
 from app.models.Users import Users
 from app.models.Couples import Couples
-from app.models.nosql import Gallery # 🌟 Import model Beanie
+from app.models.nosql import Gallery
+from app.api.notifications import manager
+from app.models.nosql import Notification
 
 router = APIRouter(prefix="/gallery", tags=["Gallery"])
 
@@ -54,12 +56,43 @@ async def upload_photo(
     )
     await new_photo.insert()
 
+    #  4. THÊM LOGIC: BẮN THÔNG BÁO CHO ĐỐI PHƯƠNG KHI ĐĂNG ẢNH MỚI
+    if couple and couple.user1_id and couple.user2_id:
+        current_user_id_str = str(current_user.id)
+        user1_id_str = str(couple.user1_id)
+        user2_id_str = str(couple.user2_id)
+        
+        # Xác định ID của người yêu
+        partner_id = user2_id_str if current_user_id_str == user1_id_str else user1_id_str
+
+        # Lưu bản ghi thông báo vào MongoDB
+        notif = Notification(
+            user_id=partner_id,
+            actor_name=current_user.display_name,
+            type="gallery_upload", # Loại thông báo mới
+            message="vừa tải lên một khoảnh khắc mới 📸",
+            link=f"/gallery?photoId={str(new_photo.id)}" # Nhấn vào sẽ tự bung ảnh này lên
+        )
+        await notif.insert()
+
+        # Bắn tín hiệu Realtime qua WebSocket cho người yêu đang online
+        await manager.send_personal_message({
+            "id": str(notif.id),
+            "actor_name": notif.actor_name,
+            "message": notif.message,
+            "type": notif.type,
+            "is_read": notif.is_read,
+            "link": notif.link,
+            "created_at": notif.created_at.isoformat()
+        }, partner_id)
+
     return {
         "success": True, 
         "photo": {
             "id": str(new_photo.id),
             "image_url": new_photo.image_url,
-            "created_at": new_photo.created_at.isoformat()
+            "created_at": new_photo.created_at.isoformat(),
+            "likes": []
         }
     }
 
@@ -135,6 +168,31 @@ async def toggle_like(
         photo.likes.remove(user_id_str)
     else:
         photo.likes.append(user_id_str)
+        
+        # XỬ LÝ BẮN THÔNG BÁO REALTIME
+        # Chỉ thông báo khi thả tim (không báo khi bỏ tim) 
+        # và KHÔNG tự thông báo cho chính mình
+        if photo.user_id != user_id_str:
+            
+            # 1. Lưu bản ghi thông báo vào MongoDB
+            notif = Notification(
+                user_id=photo.user_id, # Gửi cho chủ nhân bức ảnh
+                actor_name=current_user.display_name,
+                type="like",
+                message="đã thả tim khoảnh khắc của hai bạn ❤️",
+                link="/gallery"
+            )
+            await notif.insert()
+
+            # 2. Bắn tín hiệu WebSocket cho người kia
+            await manager.send_personal_message({
+                "id": str(notif.id),
+                "actor_name": notif.actor_name,
+                "message": notif.message,
+                "type": notif.type,
+                "link": notif.link,
+                "created_at": notif.created_at.isoformat()
+            }, photo.user_id)
     
     await photo.save()
     return {"success": True, "likes": photo.likes}

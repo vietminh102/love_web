@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.db.sql import get_db
 from app.models.Couples import Couples
+from app.api.notifications import manager
+from app.models.nosql import Notification
+
+
 import shutil
 import uuid
 import os
@@ -21,7 +25,8 @@ async def create_diary(
     location: str = Form(None),
     visibility: str = Form("couple"), # Mặc định là cả hai cùng xem
     image: UploadFile = File(None),
-    current_user: Users = Depends(get_current_user) # BẮT BUỘC ĐĂNG NHẬP
+    current_user: Users = Depends(get_current_user), # BẮT BUỘC ĐĂNG NHẬP
+    db_sql: AsyncSession = Depends(get_db) # 🌟 THÊM: Gọi Database SQL để tìm cặp đôi
 ):
     image_url = None
     
@@ -50,6 +55,45 @@ async def create_diary(
     
     await new_diary.insert()
     
+    # 3.XỬ LÝ BẮN THÔNG BÁO REALTIME (Chỉ báo nếu chế độ là couple)
+    if visibility == "couple":
+        # Tìm thông tin cặp đôi trong Postgres SQL
+        result = await db_sql.execute(
+            select(Couples).where(
+                (Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id)
+            )
+        )
+        couple = result.scalars().first()
+
+        # Chỉ bắn thông báo nếu đang trong trạng thái đã ghép đôi (không FA)
+        if couple and couple.user1_id and couple.user2_id:
+            current_user_id_str = str(current_user.id)
+            user1_id_str = str(couple.user1_id)
+            user2_id_str = str(couple.user2_id)
+            
+            # Xác định đối phương là ai
+            partner_id = user2_id_str if current_user_id_str == user1_id_str else user1_id_str
+
+            # Lưu bản ghi thông báo vào MongoDB
+            notif = Notification(
+                user_id=partner_id,
+                actor_name=current_user.display_name,
+                type="diary",
+                message="vừa viết một nhật ký mới đầy ngọt ngào 📝",
+                link="/diary"
+            )
+            await notif.insert()
+
+            # Bắn tín hiệu lên sóng WebSocket cho đối phương
+            await manager.send_personal_message({
+                "id": str(notif.id),
+                "actor_name": notif.actor_name,
+                "message": notif.message,
+                "type": notif.type,
+                "link": notif.link,
+                "created_at": notif.created_at.isoformat()
+            }, partner_id)
+
     return {
         "message": "Đã lưu nhật ký tình yêu!", 
         "id": str(new_diary.id),
@@ -173,6 +217,31 @@ async def toggle_like_diary(
     else:
         diary.liked_by.append(user_id_str) # Nếu chưa tim -> Thêm tim
         is_liked = True
+        
+        # 🌟 3. THÊM LOGIC BẮN THÔNG BÁO TẠI ĐÂY
+        # Chỉ thông báo cho người viết bài và không tự thông báo cho chính mình
+        if diary.author_id != user_id_str:
+            
+            # Lưu vào MongoDB
+            notif = Notification(
+                user_id=diary.author_id, # Gửi cho tác giả bài viết
+                actor_name=current_user.display_name,
+                type="diary_like", # 🌟 Đặt type mới để Frontend phân biệt
+                message="đã thả tim bài nhật ký của bạn ❤️",
+                link=f"/diary?diaryId={diary_id}" # Đính kèm link trỏ thẳng tới bài viết
+            )
+            await notif.insert()
+
+            # Bắn tín hiệu WebSocket
+            await manager.send_personal_message({
+                "id": str(notif.id),
+                "actor_name": notif.actor_name,
+                "message": notif.message,
+                "type": notif.type,
+                "is_read": notif.is_read,
+                "link": notif.link,
+                "created_at": notif.created_at.isoformat()
+            }, diary.author_id)
 
     await diary.save()
     

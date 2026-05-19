@@ -18,6 +18,7 @@ export function GalleryPage() {
   const [heartAnim, setHeartAnim] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastTapRef = useRef<{ [key: string]: number }>({});
   // Lấy ID user hiện tại để kiểm tra ai đã thả tim
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const myUserId = currentUser.id?.toString();
@@ -83,7 +84,17 @@ export function GalleryPage() {
       console.error("Lỗi thả tim");
     }
   };
+// HÀM GIẢ LẬP DOUBLE TAP DÀNH RIÊNG CHO ĐIỆN THOẠI
+  const handleTouchEnd = (photoId: string) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300; // Khoảng cách giữa 2 lần bấm tối đa là 300ms
+    const lastTap = lastTapRef.current[photoId] || 0;
 
+    if (now - lastTap < DOUBLE_TAP_DELAY) {
+      handleLike(photoId); // Kích hoạt thả tim nếu gõ nhanh 2 lần
+    }
+    lastTapRef.current[photoId] = now;
+  };
   //Hàm dịch logic hiển thị ai đã tim
   const renderLikeText = (likes: string[]) => {
     if (!likes || likes.length === 0) return "";
@@ -185,70 +196,84 @@ export function GalleryPage() {
         </motion.div>
       ) : (
         <div className="w-full grid grid-cols-2 gap-3">
-          {photos.map((photo, index) => (
-            <motion.div
-              key={photo.id}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              onDoubleClick={() => handleLike(photo.id)}
-              onClick={() => setSelectedPhoto(photo)} 
-              className={`relative group rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-200/50 aspect-square cursor-pointer ${getColSpan(index)}`}
-            >
-              <img src={photo.image_url} alt="Memory" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
-              
-              {/* Lớp phủ khi Hover (Chứa icon tim và số tim) */}
-              <div className="absolute inset-0 bg-lỉnear-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+          {photos.map((photo, index) => {
+            const safeLikes = photo.likes || [];
+            const isLikedByMe = safeLikes.includes(myUserId);
+
+            return (
+              <motion.div
+                key={photo.id}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                onDoubleClick={() => handleLike(photo.id)}   // Giữ double click cho Máy tính
+                onTouchEnd={() => handleTouchEnd(photo.id)}    // 🌟 THÊM: Double Tap mượt mà cho Điện thoại
+                onClick={() => setSelectedPhoto(photo)}
+                className={`relative group rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-200/50 aspect-square cursor-pointer ${getColSpan(index)}`}
+              >
+                <img src={photo.image_url} alt="Memory" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
                 
-                {/* Hiển thị Text thả tim */}
-                {photo.likes && photo.likes.length > 0 && (
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
-                    <span className="text-pink-100 text-xs font-medium drop-shadow-md">
-                      {renderLikeText(photo.likes)}
+                {/* Lớp phủ thông tin khi Hover hoặc Tap trên mobile */}
+                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                  {safeLikes.length > 0 && (
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                      <span className="text-pink-100 text-xs font-medium drop-shadow-md">
+                        {renderLikeText(safeLikes)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/80 text-xs">
+                      {new Date(photo.created_at).toLocaleDateString('vi-VN')}
                     </span>
                   </div>
-                )}
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-white/80 text-xs">
-                    {new Date(photo.created_at).toLocaleDateString('vi-VN')}
-                  </span>
                 </div>
-              </div>
 
-              {/* Nút Download & Xóa nổi lên ở góc phải */}
-              <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => handleDownload(e, photo.image_url)} className="p-2 bg-black/40 hover:bg-pink-500 rounded-full text-white backdrop-blur-sm transition-colors">
-                  <Download className="w-4 h-4" />
-                </button>
-                <button onClick={(e) => handleDelete(e, photo.id)} className="p-2 bg-black/40 hover:bg-red-500 rounded-full text-white backdrop-blur-sm transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+                {/* THANH CÔNG CỤ NỔI: Sửa đổi để dễ dùng trên mobile */}
+                <div className="absolute top-3 right-3 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20">
 
-              {/* Hiệu ứng tim bùng nổ */}
-              <AnimatePresence>
-                {heartAnim === photo.id && (
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0, rotate: -15 }} animate={{ scale: 1.5, opacity: 1, rotate: 0 }} exit={{ scale: 2, opacity: 0 }} transition={{ duration: 0.4 }}
-                    className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+                  <button onClick={(e) => handleDownload(e, photo.image_url)} className="p-2 bg-black/40 hover:bg-pink-500 rounded-full text-white backdrop-blur-sm transition-colors">
+                    <Download className="w-4 h-4" />
+                  </button>
+                  
+                  <button onClick={(e) => handleDelete(e, photo.id)} className="p-2 bg-black/40 hover:bg-red-500 rounded-full text-white backdrop-blur-sm transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                {/*  NÚT THẢ TIM  */}
+                <div className="absolute bottom-3 right-3 z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleLike(photo.id); }} 
+                    className="p-2.5 bg-black/40 hover:bg-rose-500 rounded-full text-white backdrop-blur-sm transition-colors shadow-md"
                   >
-                    <Heart className="w-16 h-16 text-rose-500 drop-shadow-2xl fill-rose-500" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          ))}
+                    <Heart className={`w-5 h-5 ${isLikedByMe ? 'fill-rose-500 text-rose-500' : 'text-white'}`} />
+                  </button>
+                </div>
+
+                {/* Hiệu ứng tim bùng nổ khi double tap */}
+                <AnimatePresence>
+                  {heartAnim === photo.id && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0, rotate: -15 }} animate={{ scale: 1.5, opacity: 1, rotate: 0 }} exit={{ scale: 2, opacity: 0 }} transition={{ duration: 0.4 }}
+                      className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+                    >
+                      <Heart className="w-16 h-16 text-rose-500 drop-shadow-2xl fill-rose-500" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
-      {/* MODAL XEM ẢNH FULLSCREEN (LIGHTBOX) */}
+      {/* MODAL XEM ẢNH FULLSCREEN */}
       <AnimatePresence>
         {selectedPhoto && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
-            onClick={() => setSelectedPhoto(null)} // Bấm ra ngoài để đóng
+            onClick={() => setSelectedPhoto(null)}
           >
             <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 p-2 rounded-full transition-colors z-50">
               <X className="w-6 h-6" />
@@ -258,13 +283,11 @@ export function GalleryPage() {
               initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}
               src={selectedPhoto.image_url}
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-              onClick={(e) => {
-                e.stopPropagation(); // Ngăn việc bấm vào ảnh làm đóng modal
-              }}
-              onDoubleClick={() => handleLike(selectedPhoto.id)} // Double click để thả tim ở màn hình lớn
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={() => handleLike(selectedPhoto.id)}
+              onTouchEnd={() => handleTouchEnd(selectedPhoto.id)} // Thả tim màn hình lớn cho mobile
             />
 
-            {/* Trái tim bùng nổ ngay trên màn hình lớn */}
             <AnimatePresence>
               {heartAnim === selectedPhoto.id && (
                 <motion.div

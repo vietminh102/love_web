@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.nosql import connect_to_mongo, close_mongo_connection
-from app.api import auth, diary, gallery
+from app.api import auth, diary, gallery, notifications
 from fastapi.staticfiles import StaticFiles
 from app.api import  couple
 
@@ -31,6 +31,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(couple.router, prefix="/api")
 app.include_router(diary.router, prefix="/api")
 app.include_router(gallery.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 @app.get("/")
 async def root():
     return {"message": "Welcome to Lovelink API!"}
