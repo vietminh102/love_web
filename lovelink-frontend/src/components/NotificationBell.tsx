@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bell,Trash2, X} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom'; // 🌟 Import useNavigate để chuyển trang
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 
 interface AppNotification {
@@ -162,6 +162,9 @@ export default function NotificationBell() {
                       {notif.type === 'like' ? '❤️' 
                         : notif.type === 'diary_like' ? '💖' 
                         : notif.type === 'gallery_upload' ? '📸' 
+                        : notif.type === 'birthday_milestone' ? '🎂'  
+                        : notif.type === 'anniversary_milestone' ? '🎉'
+                        : notif.type === 'couple_paired' ? '🥂'
                         : '📝'}
                     </div>
 

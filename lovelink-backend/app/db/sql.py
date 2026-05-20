@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
 # Tạo engine kết nối từ chuỗi POSTGRES_URL trong file .env
-engine = create_async_engine(settings.POSTGRES_URL, echo=True)
+engine = create_async_engine(settings.POSTGRES_URL, echo=False)
 
 # Tạo session factory
 async_session = sessionmaker(

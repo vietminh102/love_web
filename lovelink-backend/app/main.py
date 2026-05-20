@@ -5,13 +5,31 @@ from app.db.nosql import connect_to_mongo, close_mongo_connection
 from app.api import auth, diary, gallery, notifications
 from fastapi.staticfiles import StaticFiles
 from app.api import  couple
+from app.db.sql import get_db
+import asyncio
+from contextlib import asynccontextmanager
+from app.api.notifications import check_and_send_milestones
 
+get_db_context = asynccontextmanager(get_db)
 
+# Hàm lặp ngầm định kỳ
+async def run_milestone_scheduler():
+    while True:
+        try:
+            async with get_db_context() as db_session:
+                await check_and_send_milestones(db_session)
+                
+        except Exception as e:
+            print(f"Lỗi khi chạy quét ngày kỷ niệm: {e}")
+            
+        # Nghỉ ngơi 12 tiếng rồi quét lại tiếp (12 * 60 * 60 giây = 43200)
+        await asyncio.sleep(43200)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Chạy khi server khởi động
     await connect_to_mongo()
     print("🚀 Server đang chạy...")
+    asyncio.create_task(run_milestone_scheduler())
     yield
     # Chạy khi server tắt
     await close_mongo_connection()

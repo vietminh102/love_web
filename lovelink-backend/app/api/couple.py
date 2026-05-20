@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete
+from app.models.nosql import Notification
+from app.api.notifications import manager
 
 from app.db.sql import get_db
 from app.models.Users import Users
@@ -115,17 +117,60 @@ async def pair_with_partner(
         # Ghi nhận chính xác số giây hai bạn bắt đầu yêu
         target_couple.start_date = datetime.now(timezone.utc)
         print(f"DEBUG: Bat dau ghep doi luc {target_couple.start_date}")
+        
         # Xóa các record "độc thân" cũ của mình để tránh rác Database
         for c in my_couples:
             if c.id != target_couple.id:
                 await db.delete(c)
 
+        # Lưu mọi thay đổi xuống PostgreSQL trước
         await db.commit()
         await db.refresh(target_couple)
+        
+        
+        # A. Gửi thông báo cho BẢN THÂN (Người vừa nhập mã - User 2)
+        notif_me = Notification(
+            user_id=str(current_user.id),
+            actor_name="LoveLink",
+            type="couple_paired",
+            message="Bạn và người ấy đã ghép đôi thành công. Chúc hai bạn có những khoảnh khắc thật ngon ngào bên nhau🥂",
+            link="/home"
+        )
+        await notif_me.insert()
+        await manager.send_personal_message({
+            "id": str(notif_me.id), 
+            "actor_name": notif_me.actor_name, 
+            "message": notif_me.message,
+            "type": notif_me.type, 
+            "is_read": False, 
+            "link": notif_me.link, 
+            "created_at": notif_me.created_at.isoformat()
+        }, str(current_user.id))
+
+        # B. Gửi thông báo cho ĐỐI PHƯƠNG (Người tạo mã - User 1)
+        notif_partner = Notification(
+            user_id=str(target_couple.user1_id),
+            actor_name="LoveLink",
+            type="couple_paired",
+            message="Tuyệt vời! Người ấy đã đồng ý ghép đôi với bạn.Chúc hai bạn có những khoảnh khắc thật ngon ngào bên nhau🥂",
+            link="/home"
+        )
+        await notif_partner.insert()
+        await manager.send_personal_message({
+            "id": str(notif_partner.id), 
+            "actor_name": notif_partner.actor_name, 
+            "message": notif_partner.message,
+            "type": notif_partner.type, 
+            "is_read": False, 
+            "link": notif_partner.link, 
+            "created_at": notif_partner.created_at.isoformat()
+        }, str(target_couple.user1_id))
+
     except Exception as e:
         await db.rollback()
+        print(f"LỖI HỆ THỐNG KHI GHÉP ĐÔI: {str(e)}")
         raise HTTPException(status_code=500, detail="Lỗi hệ thống khi ghép đôi")
-
+    
     return {
         "message": "Ghép đôi thành công! Chúc hai bạn hạnh phúc 💕", 
         "couple": target_couple
