@@ -1,5 +1,5 @@
 # File: D:\Personal Project\lovelink\lovelink-backend\app\core\config.py
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings,SettingsConfigDict
 from dotenv import load_dotenv
 import os
 
@@ -14,12 +14,11 @@ class Settings(BaseSettings):
     MONGODB_NAME: str = os.getenv("MONGODB_NAME", "lovelink_content")
     
     # JWT & Bảo mật
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-me")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-mee")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 ngày
-
-    class Config:
-        case_sensitive = True
+    redis_url: str = "redis://localhost:6379"
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 # ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT: Khởi tạo biến settings để các file khác import
 settings = Settings()
