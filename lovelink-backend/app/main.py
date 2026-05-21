@@ -4,11 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.nosql import connect_to_mongo, close_mongo_connection
 from app.api import auth, diary, gallery, notifications
 from fastapi.staticfiles import StaticFiles
-from app.api import  couple
-from app.db.sql import get_db
+from app.api import couple
 import asyncio
-from contextlib import asynccontextmanager
 from app.api.notifications import check_and_send_milestones
+
+from app.db.sql import get_db, engine
+from app.models.postgres import Base
 
 get_db_context = asynccontextmanager(get_db)
 
@@ -24,11 +25,22 @@ async def run_milestone_scheduler():
             
         # Nghỉ ngơi 12 tiếng rồi quét lại tiếp (12 * 60 * 60 giây = 43200)
         await asyncio.sleep(43200)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 👇 Ra lệnh cho Postgres xây nhà dựa trên bản vẽ (Base)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Đã kiểm tra và tạo các bảng Postgres thành công!")
+    except Exception as e:
+        print(f"Lỗi khi tạo bảng Postgres: {e}")
+
     # Chạy khi server khởi động
     await connect_to_mongo()
+    print("✅ Đã kết nối MongoDB và khởi tạo Beanie thành công!")
     print("🚀 Server đang chạy...")
+    
     asyncio.create_task(run_milestone_scheduler())
     yield
     # Chạy khi server tắt
@@ -36,8 +48,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://love-web-steel.vercel.app"], 
@@ -45,11 +57,13 @@ app.add_middleware(
     allow_methods=["*"], # Cho phép GET, POST, PUT, DELETE...
     allow_headers=["*"],
 )
+
 app.include_router(auth.router, prefix="/api")
 app.include_router(couple.router, prefix="/api")
 app.include_router(diary.router, prefix="/api")
 app.include_router(gallery.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to Lovelink API!"}
