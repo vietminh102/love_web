@@ -76,6 +76,22 @@ export default function OnboardingPage() {
     }
   };
 
+  const getFinalAvatarUrl = (url: string) => {
+    if (!url) return 'https://via.placeholder.com/150'; // Ảnh mặc định
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url; // Ảnh nháp
+    
+    // Dọn dẹp sạch sẽ dấu / dư thừa
+    const safeBase = API_BASE_URL.replace(/\/$/, '');
+    
+    if (url.startsWith('http')) {
+      return url.replace('http://localhost:8000', safeBase); // Gọt rác localhost
+    }
+    
+    // Lắp ráp bằng ĐÚNG 1 dấu / ở giữa
+    const safePath = url.replace(/^\//, '');
+    return `${safeBase}/${safePath}`;
+  };
+
   return (
     <div className="min-h-screen bg-pink-50 flex flex-col items-center justify-center p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-pink-100 text-center">
@@ -88,17 +104,11 @@ export default function OnboardingPage() {
           {/* 🌟 THÊM: KHU VỰC SỬA ẢNH ĐẠI DIỆN */}
           <div className="flex flex-col items-center gap-2 mb-4">
             <div className="relative group">
-              <img 
-                src={
-                  avatarUrl.startsWith('data:') || avatarUrl.startsWith('blob:')
-                    ? avatarUrl // Trả về nguyên gốc nếu là ảnh nháp (Base64 hoặc Blob)
-                    : avatarUrl.startsWith('http')
-                      ? avatarUrl.replace('http://localhost:8000', API_BASE_URL) // Gọt rác localhost hoặc giữ nguyên ảnh placeholder
-                      : `${API_BASE_URL.replace(/\/$/, '')}/${avatarUrl.replace(/^\//, '')}` // Ghép link nếu là đường dẫn chuẩn /static/...
-                } 
-                alt="Avatar" 
-                className="w-24 h-24 rounded-full object-cover border-4 border-pink-100 shadow-inner"
-              />
+            <img 
+              src={getFinalAvatarUrl(avatarUrl)} 
+              alt="Avatar" 
+              className="w-24 h-24 rounded-full object-cover border-4 border-pink-100 shadow-inner"
+            />
               {/* Nút bấm thay đổi ảnh đè lên khi hover */}
               <button
                 type="button"
