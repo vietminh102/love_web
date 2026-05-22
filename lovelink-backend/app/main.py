@@ -58,11 +58,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/api")
-app.include_router(couple.router, prefix="/api")
-app.include_router(diary.router, prefix="/api")
-app.include_router(gallery.router, prefix="/api")
-app.include_router(notifications.router, prefix="/api")
+app.include_router(auth.router)
+app.include_router(couple.router)
+app.include_router(diary.router)
+app.include_router(gallery.router)
+app.include_router(notifications.router)
 
 @app.get("/")
 async def root():
