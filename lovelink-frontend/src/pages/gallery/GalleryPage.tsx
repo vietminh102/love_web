@@ -115,7 +115,7 @@ export function GalleryPage() {
         ? url.replace('http://localhost:8000', API_BASE_URL) 
         : `${API_BASE_URL}${url}`;
         
-      const response = await fetch(fullUrl);
+      const response = await fetch(`${fullUrl}?t=${new Date().getTime()}`);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
