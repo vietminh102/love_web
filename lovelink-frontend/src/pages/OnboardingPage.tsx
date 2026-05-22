@@ -94,11 +94,9 @@ export default function OnboardingPage() {
                     ? 'https://via.placeholder.com/150' 
                     : avatarUrl.startsWith('data:') || avatarUrl.startsWith('blob:')
                       ? avatarUrl 
-                      : avatarUrl.includes('.comstatic')
-                        ? avatarUrl.replace('.comstatic', '.com/static') // Tẩy rác dính link cũ
-                        : avatarUrl.startsWith('http')
-                          ? avatarUrl.replace('http://localhost:8000', API_BASE_URL.replace(/\/$/, '')) // Gọt rác localhost
-                          : `${API_BASE_URL.replace(/\/$/, '')}/${avatarUrl.replace(/^\//, '')}` // Ghép an toàn với ĐÚNG 1 dấu "/"
+                      : avatarUrl.includes('static/')
+                        ? `${API_BASE_URL.replace(/\/$/, '')}/static/${avatarUrl.split('static/').pop()}`
+                        : `${API_BASE_URL.replace(/\/$/, '')}/${avatarUrl.replace(/^\//, '')}`
                 } 
                 alt="Avatar" 
                 className="w-24 h-24 rounded-full object-cover border-4 border-pink-100 shadow-inner"
