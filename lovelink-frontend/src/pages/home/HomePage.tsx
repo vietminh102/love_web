@@ -15,6 +15,7 @@ export default function HomePage() {
   const [loveTime, setLoveTime] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [editDateInput, setEditDateInput] = useState(''); 
   const [isEditingDate, setIsEditingDate] = useState(false);
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   
   // Backgroud
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -23,6 +24,21 @@ export default function HomePage() {
     name1: user?.display_name || 'Bạn', 
     name2: 'Đang tải...'
   });
+  const getFullImageUrl = (url: string | null) => {
+    if (!url) return '';
+    // 1. Dành cho ảnh nháp lúc vừa bấm chọn (blob:...)
+    if (url.startsWith('blob:')) return url;
+    
+    // 2. Dọn rác DB cũ: Phát hiện chữ localhost thì tự động chặt đi thay bằng link Vercel
+    if (url.includes('localhost:8000')) {
+      return url.replace('http://localhost:8000', API_BASE_URL);
+    }
+    
+    // 3. Dành cho chuẩn mới: Cộng link Render vào trước đuôi /static/...
+    if (url.startsWith('/')) return `${API_BASE_URL}${url}`;
+    
+    return url;
+  };
 
   // --- ĐÃ XÓA USE_EFFECT LOCALSTORAGE CŨ BỊ XUNG ĐỘT Ở ĐÂY ---
 
@@ -163,7 +179,7 @@ export default function HomePage() {
     <div className="min-h-screen w-full  via-rose-200 to-red-200 relative overflow-hidden font-sans">
       <div 
         className="absolute inset-0 z-0 transition-all duration-700 bg-contain bg-center bg-no-repeat bg-pink-100"
-        style={(bgImage && hasPartner) ? { backgroundImage: `url(${bgImage})` } : {}}
+        style={(bgImage && hasPartner) ? { backgroundImage: `url('${getFullImageUrl(bgImage)}')` } : {}}
       >
         {!(bgImage && hasPartner) && (
           <div className="absolute inset-0 bg-linear-to-br from-pink-200 via-rose-200 to-red-200" />
