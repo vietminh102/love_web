@@ -17,6 +17,7 @@ interface AppNotification {
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const VITE_API_URL = import.meta.env.VITE_API_URL;
   const token = localStorage.getItem('token');
   const navigate = useNavigate(); // 🌟 Khởi tạo hook chuyển trang
 
@@ -37,7 +38,8 @@ export default function NotificationBell() {
     fetchHistory();
 
     // 2. Kết nối WebSocket realtime
-    const ws = new WebSocket(`ws://localhost:8000/api/notifications/ws?token=${token}`);
+    const wsUrl = VITE_API_URL.replace(/^http/, 'ws') + '/notifications/ws';
+    const ws = new WebSocket(wsUrl);
     
     ws.onmessage = (event) => {
       const newNotif = JSON.parse(event.data);

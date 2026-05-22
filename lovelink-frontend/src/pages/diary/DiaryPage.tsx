@@ -321,7 +321,7 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
             {previewUrl && (
               <div className="mt-2 h-32 w-full rounded-lg overflow-hidden border border-pink-200 relative shadow-sm">
                 <img 
-                  src={`${API_BASE_URL}${previewUrl}`} 
+                  src={previewUrl.startsWith('blob:') ? previewUrl : `${API_BASE_URL}${previewUrl}`}
                   alt="Preview" 
                   className="w-full h-full object-cover" 
                 />

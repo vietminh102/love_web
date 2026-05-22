@@ -26,20 +26,16 @@ export default function HomePage() {
   });
   const getFullImageUrl = (url: string | null) => {
     if (!url) return '';
-    if (url.startsWith('blob:')) return url; // Ảnh nháp
+    // 1. Dành cho ảnh nháp lúc vừa bấm chọn (blob:...)
+    if (url.startsWith('blob:')) return url;
     
-    // Xóa sạch dấu gạch chéo (/) ở cuối API_BASE_URL nếu lỡ tay thêm vào
-    const safeBaseUrl = API_BASE_URL.replace(/\/$/, '');
-
-    // Dọn rác localhost
+    // 2. Dọn rác DB cũ: Phát hiện chữ localhost thì tự động chặt đi thay bằng link Vercel
     if (url.includes('localhost:8000')) {
-      return url.replace('http://localhost:8000', safeBaseUrl);
+      return url.replace('http://localhost:8000', API_BASE_URL);
     }
     
-    // Ghép link chuẩn xác (không bao giờ bị lỗi //)
-    if (url.startsWith('/')) {
-      return `${safeBaseUrl}${url}`;
-    }
+    // 3. Dành cho chuẩn mới: Cộng link Render vào trước đuôi /static/...
+    if (url.startsWith('/')) return `${API_BASE_URL}${url}`;
     
     return url;
   };
@@ -112,29 +108,19 @@ export default function HomePage() {
     const file = e.target.files?.[0];
     if (file && hasPartner) {
       try {
-        // 1. Cho hiển thị tạm ảnh lên màn hình (Lúc nó nháy lên)
+        // MẸO UX: Cho hiển thị tạm ảnh lên màn hình ngay lập tức để cảm giác mượt mà
         const tempUrl = URL.createObjectURL(file);
         setBgImage(tempUrl); 
         
-        // 2. GỌI API
+        // GỌI API GỬI FILE LÊN MONGODB/POSTGRESQL
         const res = await coupleService.uploadBackground(file);
         
-        // 3. IN RA F12 ĐỂ BẮT TẬN TAY BACKEND TRẢ VỀ GÌ
-        console.log("Phản hồi từ Backend sau khi tải ảnh:", res);
-        
-        // 4. BỘ LỌC BẢO HIỂM: Bắt mọi trường hợp tên biến Backend có thể trả về
-        const finalUrl = res.background_url || res.file_url || res.url || res.data?.background_url;
-        
-        if (finalUrl) {
-          setBgImage(finalUrl); // Chốt ảnh thật
-        } else {
-          console.error("Không tìm thấy đường link trong phản hồi của Backend!");
-        }
-        
+        // Thành công thì dùng ảnh xịn từ server
+        setBgImage(res.background_url); 
       } catch (error) {
         console.error("Lỗi up ảnh nền", error);
         alert("Có lỗi xảy ra khi tải ảnh lên!");
-        setBgImage(null); // Lỗi thật thì mới gỡ ảnh
+        setBgImage(null); // Nếu lỗi thì gỡ ảnh tạm đi
       }
     }
   };
