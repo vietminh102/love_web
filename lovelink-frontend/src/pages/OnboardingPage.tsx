@@ -8,6 +8,7 @@ export default function OnboardingPage() {
   const [gender, setGender] = useState(storedUser.gender || '');
   const [dob, setDob] = useState(storedUser.dob || '');
   const [loading, setLoading] = useState(false);
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   // 🌟 State mới để quản lý ảnh đại diện
   const [avatarUrl, setAvatarUrl] = useState(storedUser.avatar_url || 'https://via.placeholder.com/150');
@@ -88,7 +89,7 @@ export default function OnboardingPage() {
           <div className="flex flex-col items-center gap-2 mb-4">
             <div className="relative group">
               <img 
-                src={avatarUrl} 
+                src={`${API_BASE_URL}${avatarUrl}`} 
                 alt="Avatar" 
                 className="w-24 h-24 rounded-full object-cover border-4 border-pink-100 shadow-inner"
               />

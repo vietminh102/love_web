@@ -18,6 +18,7 @@ interface DiaryEntry {
 }
 
 export function DiaryPage() {
+  
   const { user } = useAuth(); // Lấy thông tin user đang đăng nhập
   const [isWriting, setIsWriting] = useState(false);
   const [entries, setEntries] = useState<any[]>([]);
@@ -140,6 +141,7 @@ export function DiaryPage() {
 
 function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void, onSave: (entry: DiaryEntry, isEdit?: boolean) => void, initialData?: DiaryEntry | null }) {
   // Điền dữ liệu cũ nếu đang trong chế độ Sửa
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const { user } = useAuth();
   const [title, setTitle] = useState(initialData?.title || '');
   const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
@@ -319,7 +321,7 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
             {previewUrl && (
               <div className="mt-2 h-32 w-full rounded-lg overflow-hidden border border-pink-200 relative shadow-sm">
                 <img 
-                  src={previewUrl} 
+                  src={`${API_BASE_URL}${previewUrl}`} 
                   alt="Preview" 
                   className="w-full h-full object-cover" 
                 />
@@ -381,6 +383,7 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
   const [showHearts, setShowHearts] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false); 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   // BƯỚC 1: QUẢN LÝ DANH SÁCH NGƯỜI ĐÃ THẢ TIM THAY VÌ CHỈ BOOLEAN
   const [likedByData, setLikedByData] = useState<string[]>(entry.liked_by || []);
@@ -517,7 +520,7 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
             <div className="w-full h-55 rounded-2xl overflow-hidden mb-4 relative cursor-pointer"
             onClick={() => setSelectedImage(entry.image_url ?? null)} >
               <img 
-                src={entry.image_url} 
+                src={`${API_BASE_URL}${entry.image_url}`} 
                 alt={entry.title} 
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-in-out"
               />
@@ -578,7 +581,7 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
             <X className="w-6 h-6" />
           </button>
           <img 
-            src={selectedImage} 
+            src={`${API_BASE_URL}${selectedImage}`} 
             alt="Phóng to" 
             className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
             onClick={(e) => e.stopPropagation()} 

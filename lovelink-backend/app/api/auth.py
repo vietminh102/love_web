@@ -257,7 +257,7 @@ async def update_profile(
                 f.write(content)
             
             # Lưu đường dẫn vào user object
-            current_user.avatar_url = f"http://localhost:8000/static/avatars/{file_name}"
+            current_user.avatar_url = f"/static/avatars/{file_name}"
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Lỗi khi lưu ảnh: {str(e)}")
 
@@ -335,7 +335,7 @@ async def update_user_avatar(
             f.write(content)
         
         # 4. Lưu đường dẫn vào user object
-        current_user.avatar_url = f"http://localhost:8000/static/avatars/{file_name}"
+        current_user.avatar_url = f"static/avatars/{file_name}"
         
         # 5. Lưu vào Database
         await db.commit()

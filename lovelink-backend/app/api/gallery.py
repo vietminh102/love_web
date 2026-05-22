@@ -43,7 +43,7 @@ async def upload_photo(
     with open(file_path, "wb") as f:
         f.write(content)
     
-    image_url = f"http://localhost:8000/static/gallery/{file_name}"
+    image_url = f"/static/gallery/{file_name}"
 
     # 2. Xử lý logic Độc thân/Cặp đôi
     couple = await get_user_couple(db_sql, current_user.id)

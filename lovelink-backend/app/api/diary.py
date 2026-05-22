@@ -40,7 +40,7 @@ async def create_diary(
         with open(file_path, "wb+") as buffer:
             shutil.copyfileobj(image.file, buffer)
             
-        image_url = f"http://localhost:8000/{file_path}"
+        image_url = f"/{file_path}"
 
     # 2. Tạo nhật ký
     new_diary = Diary(
@@ -171,7 +171,7 @@ async def update_diary(
         with open(file_path, "wb+") as buffer:
             shutil.copyfileobj(image.file, buffer)
             
-        diary.image_url = f"http://localhost:8000/{file_path}"
+        diary.image_url = f"/{file_path}"
 
     # 4. Cập nhật các trường text
     if title: diary.title = title

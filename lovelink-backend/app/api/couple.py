@@ -291,7 +291,7 @@ async def upload_couple_background(
             shutil.copyfileobj(file.file, buffer)
             
         # Cập nhật DB
-        background_url = f"http://localhost:8000/{file_path}"
+        background_url = f"/{file_path}"
         couple.background_url = background_url
         
         await db.commit()
