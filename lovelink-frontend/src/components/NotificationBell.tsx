@@ -38,7 +38,12 @@ export default function NotificationBell() {
     fetchHistory();
 
     // 2. Kết nối WebSocket realtime
-    const wsUrl = VITE_API_URL.replace(/^http/, 'ws') + '/notifications/ws';
+    // BƯỚC 1: Cắt bỏ dấu gạch chéo (/) ở cuối link nếu vô tình bị dư
+    const safeBaseUrl = VITE_API_URL.replace(/\/$/, '');
+    
+    // BƯỚC 2: Nối thêm '?token=' + token vào đuôi link để nộp vé cho Backend
+    const wsUrl = safeBaseUrl.replace(/^http/, 'ws') + '/notifications/ws?token=' + token;
+    
     const ws = new WebSocket(wsUrl);
     
     ws.onmessage = (event) => {
