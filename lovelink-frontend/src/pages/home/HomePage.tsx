@@ -108,19 +108,29 @@ export default function HomePage() {
     const file = e.target.files?.[0];
     if (file && hasPartner) {
       try {
-        // MẸO UX: Cho hiển thị tạm ảnh lên màn hình ngay lập tức để cảm giác mượt mà
+        // 1. Cho hiển thị tạm ảnh lên màn hình (Lúc nó nháy lên)
         const tempUrl = URL.createObjectURL(file);
         setBgImage(tempUrl); 
         
-        // GỌI API GỬI FILE LÊN MONGODB/POSTGRESQL
+        // 2. GỌI API
         const res = await coupleService.uploadBackground(file);
         
-        // Thành công thì dùng ảnh xịn từ server
-        setBgImage(res.background_url); 
+        // 3. IN RA F12 ĐỂ BẮT TẬN TAY BACKEND TRẢ VỀ GÌ
+        console.log("Phản hồi từ Backend sau khi tải ảnh:", res);
+        
+        // 4. BỘ LỌC BẢO HIỂM: Bắt mọi trường hợp tên biến Backend có thể trả về
+        const finalUrl = res.background_url || res.file_url || res.url || res.data?.background_url;
+        
+        if (finalUrl) {
+          setBgImage(finalUrl); // Chốt ảnh thật
+        } else {
+          console.error("Không tìm thấy đường link trong phản hồi của Backend!");
+        }
+        
       } catch (error) {
         console.error("Lỗi up ảnh nền", error);
         alert("Có lỗi xảy ra khi tải ảnh lên!");
-        setBgImage(null); // Nếu lỗi thì gỡ ảnh tạm đi
+        setBgImage(null); // Lỗi thật thì mới gỡ ảnh
       }
     }
   };
