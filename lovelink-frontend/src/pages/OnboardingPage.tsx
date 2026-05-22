@@ -94,7 +94,7 @@ export default function OnboardingPage() {
                     ? avatarUrl // Trả về nguyên gốc nếu là ảnh nháp (Base64 hoặc Blob)
                     : avatarUrl.startsWith('http')
                       ? avatarUrl.replace('http://localhost:8000', API_BASE_URL) // Gọt rác localhost hoặc giữ nguyên ảnh placeholder
-                      : `${API_BASE_URL}${avatarUrl}` // Ghép link nếu là đường dẫn chuẩn /static/...
+                      : `${API_BASE_URL.replace(/\/$/, '')}/${avatarUrl.replace(/^\//, '')}` // Ghép link nếu là đường dẫn chuẩn /static/...
                 } 
                 alt="Avatar" 
                 className="w-24 h-24 rounded-full object-cover border-4 border-pink-100 shadow-inner"
