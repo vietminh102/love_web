@@ -26,16 +26,20 @@ export default function HomePage() {
   });
   const getFullImageUrl = (url: string | null) => {
     if (!url) return '';
-    // 1. Dành cho ảnh nháp lúc vừa bấm chọn (blob:...)
-    if (url.startsWith('blob:')) return url;
+    if (url.startsWith('blob:')) return url; // Ảnh nháp
     
-    // 2. Dọn rác DB cũ: Phát hiện chữ localhost thì tự động chặt đi thay bằng link Vercel
+    // Xóa sạch dấu gạch chéo (/) ở cuối API_BASE_URL nếu lỡ tay thêm vào
+    const safeBaseUrl = API_BASE_URL.replace(/\/$/, '');
+
+    // Dọn rác localhost
     if (url.includes('localhost:8000')) {
-      return url.replace('http://localhost:8000', API_BASE_URL);
+      return url.replace('http://localhost:8000', safeBaseUrl);
     }
     
-    // 3. Dành cho chuẩn mới: Cộng link Render vào trước đuôi /static/...
-    if (url.startsWith('/')) return `${API_BASE_URL}${url}`;
+    // Ghép link chuẩn xác (không bao giờ bị lỗi //)
+    if (url.startsWith('/')) {
+      return `${safeBaseUrl}${url}`;
+    }
     
     return url;
   };
