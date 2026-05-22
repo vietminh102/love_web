@@ -108,9 +108,14 @@ export function GalleryPage() {
 
   //Hàm tải ảnh về máy
   const handleDownload = async (e: React.MouseEvent, url: string) => {
-    e.stopPropagation(); // Ngăn mở lightbox khi bấm nút
+    e.stopPropagation(); 
     try {
-      const response = await fetch(url);
+      // Ép link chuẩn ngay tại chỗ
+      const fullUrl = url.startsWith('http') 
+        ? url.replace('http://localhost:8000', API_BASE_URL) 
+        : `${API_BASE_URL}${url}`;
+        
+      const response = await fetch(fullUrl);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -282,11 +287,15 @@ export function GalleryPage() {
 
             <motion.img
               initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              src={selectedPhoto.image_url}
+              src={
+                selectedPhoto.image_url.startsWith('http') 
+                  ? selectedPhoto.image_url.replace('http://localhost:8000', API_BASE_URL) 
+                  : `${API_BASE_URL}${selectedPhoto.image_url}`
+              }
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
               onDoubleClick={() => handleLike(selectedPhoto.id)}
-              onTouchEnd={() => handleTouchEnd(selectedPhoto.id)} // Thả tim màn hình lớn cho mobile
+              onTouchEnd={() => handleTouchEnd(selectedPhoto.id)} 
             />
 
             <AnimatePresence>

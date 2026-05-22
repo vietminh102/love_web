@@ -176,23 +176,39 @@ async def get_notifications(current_user: Users = Depends(get_current_user)):
 
 # 2. ENDPOINT KẾT NỐI WEBSOCKET
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str):
+async def websocket_endpoint(websocket: WebSocket, token: str = None): # Thêm = None để không bị chặn ngoài cửa
     """Client sẽ kết nối vào đây bằng ws://.../ws?token=ABC"""
     try:
-        # Giải mã token để biết ai đang kết nối
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if not token or token == "null" or token == "undefined":
+            print("❌ WebSocket bị từ chối: Không có token")
+            await websocket.close(code=1008)
+            return
+            
+        # 1. DỌN RÁC TOKEN: Cắt bỏ chữ Bearer và dấu nháy nếu lỡ dính vào
+        clean_token = token.replace("Bearer ", "").replace('"', '').replace("'", "")
+        
+        # 2. Giải mã token
+        payload = jwt.decode(clean_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = str(payload.get("sub"))
-    except:
-        await websocket.close()
+        
+    except Exception as e:
+        # IN LỖI RA RENDER LOG ĐỂ DỄ DÀNG BẮT TẬN TAY
+        print(f"❌ Lỗi giải mã Token WebSocket: {str(e)}") 
+        await websocket.close(code=1008)
         return
 
+    # 3. Kết nối thành công
     await manager.connect(websocket, user_id)
+    print(f"✅ User {user_id} đã kết nối Realtime thành công!")
+    
     try:
         while True:
             # Chờ nhận tin nhắn từ client (nhịp tim keep-alive)
             await websocket.receive_text()
+            
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)
+        print(f"⚠️ User {user_id} đã ngắt kết nối.")
 @router.post("/{notif_id}/read")
 async def mark_as_read(notif_id: str, current_user: Users = Depends(get_current_user)):
     try:

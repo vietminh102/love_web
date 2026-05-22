@@ -176,7 +176,17 @@ export default function UserMenu() {
             <div className="p-4 bg-linear-to-br from-pink-50 to-rose-50 border-b border-pink-100/60 flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center overflow-hidden border-2 border-white shadow-sm shrink-0">
                 {editForm.avatarUrl ? (
-                  <img src={`${API_BASE_URL}${editForm.avatarUrl}`} alt="avatar" className="w-full h-full object-cover" />
+                  <img 
+                    src={
+                      editForm.avatarUrl.startsWith('blob:') 
+                        ? editForm.avatarUrl 
+                        : editForm.avatarUrl.startsWith('http') 
+                          ? editForm.avatarUrl.replace('http://localhost:8000', API_BASE_URL) 
+                          : `${API_BASE_URL}${editForm.avatarUrl}`
+                    } 
+                    alt="avatar" 
+                    className="w-full h-full object-cover" 
+                  />
                 ) : (
                   <User className="w-6 h-6 text-pink-400" />
                 )}
@@ -349,7 +359,17 @@ export default function UserMenu() {
                 <div className="relative group cursor-pointer">
                   <div className="w-24 h-24 rounded-full bg-pink-100 flex items-center justify-center overflow-hidden border-4 border-pink-50 shadow-md">
                     {editForm.avatarUrl ? (
-                      <img src={`${API_BASE_URL}${editForm.avatarUrl}`} alt="avatar preview" className="w-full h-full object-cover" />
+                      <img 
+                        src={
+                          editForm.avatarUrl.startsWith('blob:') 
+                            ? editForm.avatarUrl 
+                            : editForm.avatarUrl.startsWith('http') 
+                              ? editForm.avatarUrl.replace('http://localhost:8000', API_BASE_URL) 
+                              : `${API_BASE_URL}${editForm.avatarUrl}`
+                        } 
+                        alt="avatar preview" 
+                        className="w-full h-full object-cover" 
+                      />
                     ) : (
                       <User className="w-10 h-10 text-pink-400" />
                     )}
