@@ -89,13 +89,7 @@ export default function OnboardingPage() {
           <div className="flex flex-col items-center gap-2 mb-4">
             <div className="relative group">
               <img 
-                src={
-                  avatarUrl.startsWith('data:') || avatarUrl.startsWith('blob:')
-                    ? avatarUrl // Trả về nguyên gốc nếu là ảnh nháp (Base64 hoặc Blob)
-                    : avatarUrl.startsWith('http')
-                      ? avatarUrl.replace('http://localhost:8000', API_BASE_URL) // Gọt rác localhost hoặc giữ nguyên ảnh placeholder
-                      : `${API_BASE_URL}/${avatarUrl}` // Ghép link nếu là đường dẫn chuẩn /static/...
-                } 
+                src={avatarUrl.startsWith('blob:') ? avatarUrl : `${API_BASE_URL}${avatarUrl}`}
                 alt="Avatar" 
                 className="w-24 h-24 rounded-full object-cover border-4 border-pink-100 shadow-inner"
               />
