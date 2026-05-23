@@ -20,5 +20,10 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+    # DAM MAY
+    cloudinary_cloud_name: str
+    cloudinary_api_key: str
+    cloudinary_api_secret: str
+
 # ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT: Khởi tạo biến settings để các file khác import
 settings = Settings()

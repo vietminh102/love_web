@@ -13,11 +13,11 @@ from app.models.nosql import Gallery
 from app.api.notifications import manager
 from app.models.nosql import Notification
 
+from app.api.cloudinary_utils import upload_image_to_cloud
+
 router = APIRouter(prefix="/gallery", tags=["Gallery"])
 
-UPLOAD_DIR = "static/gallery"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+# Đã xóa UPLOAD_DIR và os.makedirs vì không còn lưu ổ cứng nữa!
 
 async def get_user_couple(db_sql: AsyncSession, user_id: int):
     result = await db_sql.execute(
@@ -34,21 +34,17 @@ async def upload_photo(
     db_sql: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user)
 ):
-    # 1. Lưu file ảnh thực tế
-    ext = file.filename.split(".")[-1].lower()
-    file_name = f"{uuid.uuid4().hex}.{ext}"
-    file_path = os.path.join(UPLOAD_DIR, file_name)
-
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
-    
-    image_url = f"/static/gallery/{file_name}"
+    # 1. 🌟 LÊN MÂY: Giao ảnh cho Cloudinary, lưu vào thư mục 'lovelink/gallery'
+    cloud_url = upload_image_to_cloud(file.file, folder_name="lovelink/gallery")
+    if not cloud_url:
+        raise HTTPException(status_code=400, detail="Không thể tải ảnh lên mây lúc này!")
+        
+    image_url = cloud_url
 
     # 2. Xử lý logic Độc thân/Cặp đôi
     couple = await get_user_couple(db_sql, current_user.id)
     
-    # 3. 🌟 LƯU BẰNG BEANIE (Cực kỳ ngắn gọn)
+    # 3. LƯU BẰNG BEANIE
     new_photo = Gallery(
         user_id=str(current_user.id), 
         couple_id=str(couple.id) if couple else None, 
@@ -56,26 +52,23 @@ async def upload_photo(
     )
     await new_photo.insert()
 
-    #  4. THÊM LOGIC: BẮN THÔNG BÁO CHO ĐỐI PHƯƠNG KHI ĐĂNG ẢNH MỚI
+    # 4. BẮN THÔNG BÁO CHO ĐỐI PHƯƠNG KHI ĐĂNG ẢNH MỚI
     if couple and couple.user1_id and couple.user2_id:
         current_user_id_str = str(current_user.id)
         user1_id_str = str(couple.user1_id)
         user2_id_str = str(couple.user2_id)
         
-        # Xác định ID của người yêu
         partner_id = user2_id_str if current_user_id_str == user1_id_str else user1_id_str
 
-        # Lưu bản ghi thông báo vào MongoDB
         notif = Notification(
             user_id=partner_id,
             actor_name=current_user.display_name,
-            type="gallery_upload", # Loại thông báo mới
+            type="gallery_upload", 
             message="vừa tải lên một khoảnh khắc mới 📸",
-            link=f"/gallery?photoId={str(new_photo.id)}" # Nhấn vào sẽ tự bung ảnh này lên
+            link=f"/gallery?photoId={str(new_photo.id)}" 
         )
         await notif.insert()
 
-        # Bắn tín hiệu Realtime qua WebSocket cho người yêu đang online
         await manager.send_personal_message({
             "id": str(notif.id),
             "actor_name": notif.actor_name,
@@ -103,18 +96,14 @@ async def get_photos(
 ):
     couple = await get_user_couple(db_sql, current_user.id)
     
-    # 🌟 TÌM KIẾM BẰNG BEANIE
     if couple:
-        # Nếu có người yêu:
         photos = await Gallery.find(Gallery.couple_id == str(couple.id)).sort("-created_at").to_list()
     else:
-        # Nếu FA:
         photos = await Gallery.find(
             Gallery.user_id == str(current_user.id), 
             Gallery.couple_id == None
         ).sort("-created_at").to_list()
         
-    # Format lại ID cho Frontend
     formatted_photos = [
         {
             "id": str(p.id),
@@ -126,7 +115,7 @@ async def get_photos(
     ]
         
     return formatted_photos 
-# XOA ANH
+
 @router.delete("/{photo_id}")
 async def delete_photo(
     photo_id: str, 
@@ -138,20 +127,18 @@ async def delete_photo(
         if not photo:
             raise HTTPException(status_code=404, detail="Không tìm thấy ảnh")
         
-        # Kiểm tra quyền: Chỉ cho xóa nếu là ảnh của mình hoặc ảnh chung của couple
         couple = await get_user_couple(db_sql, current_user.id)
         if str(photo.user_id) != str(current_user.id):
             if not couple or str(photo.couple_id) != str(couple.id):
                 raise HTTPException(status_code=403, detail="Bạn không có quyền xóa ảnh này")
 
-        # Có thể thêm logic dùng os.remove() để xóa file vật lý trong folder static ở đây
-
+        # Xóa bản ghi trong Database. 
+        # (Ảnh gốc trên Cloudinary vẫn giữ làm backup an toàn, tránh xóa nhầm không cứu được).
         await photo.delete()
         return {"success": True, "message": "Đã xóa ảnh"}
     except Exception:
         raise HTTPException(status_code=400, detail="ID ảnh không hợp lệ")
 
-# THẢ TIM / BỎ TIM
 @router.post("/{photo_id}/like")
 async def toggle_like(
     photo_id: str, 
@@ -163,20 +150,14 @@ async def toggle_like(
     
     user_id_str = str(current_user.id)
     
-    # Nếu đã tim rồi thì gỡ tim, chưa có thì thả tim
     if user_id_str in photo.likes:
         photo.likes.remove(user_id_str)
     else:
         photo.likes.append(user_id_str)
         
-        # XỬ LÝ BẮN THÔNG BÁO REALTIME
-        # Chỉ thông báo khi thả tim (không báo khi bỏ tim) 
-        # và KHÔNG tự thông báo cho chính mình
         if photo.user_id != user_id_str:
-            
-            # 1. Lưu bản ghi thông báo vào MongoDB
             notif = Notification(
-                user_id=photo.user_id, # Gửi cho chủ nhân bức ảnh
+                user_id=photo.user_id, 
                 actor_name=current_user.display_name,
                 type="like",
                 message="đã thả tim khoảnh khắc của hai bạn ❤️",
@@ -184,7 +165,6 @@ async def toggle_like(
             )
             await notif.insert()
 
-            # 2. Bắn tín hiệu WebSocket cho người kia
             await manager.send_personal_message({
                 "id": str(notif.id),
                 "actor_name": notif.actor_name,

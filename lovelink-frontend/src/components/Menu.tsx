@@ -10,7 +10,8 @@ export default function UserMenu() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  
+  // 🌟 Đã xóa API_BASE_URL vì không còn cần thiết nữa
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPairModalOpen, setIsPairModalOpen] = useState(false);
@@ -177,13 +178,7 @@ export default function UserMenu() {
               <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center overflow-hidden border-2 border-white shadow-sm shrink-0">
                 {editForm.avatarUrl ? (
                   <img 
-                    src={
-                      editForm.avatarUrl.startsWith('blob:') 
-                        ? editForm.avatarUrl 
-                        : editForm.avatarUrl.startsWith('http') 
-                          ? editForm.avatarUrl.replace('http://localhost:8000', API_BASE_URL) 
-                          : `${API_BASE_URL}${editForm.avatarUrl}`
-                    } 
+                    src={editForm.avatarUrl} 
                     alt="avatar" 
                     className="w-full h-full object-cover" 
                   />
@@ -360,13 +355,7 @@ export default function UserMenu() {
                   <div className="w-24 h-24 rounded-full bg-pink-100 flex items-center justify-center overflow-hidden border-4 border-pink-50 shadow-md">
                     {editForm.avatarUrl ? (
                       <img 
-                        src={
-                          editForm.avatarUrl.startsWith('blob:') 
-                            ? editForm.avatarUrl 
-                            : editForm.avatarUrl.startsWith('http') 
-                              ? editForm.avatarUrl.replace('http://localhost:8000', API_BASE_URL) 
-                              : `${API_BASE_URL}${editForm.avatarUrl}`
-                        } 
+                        src={editForm.avatarUrl} 
                         alt="avatar preview" 
                         className="w-full h-full object-cover" 
                       />

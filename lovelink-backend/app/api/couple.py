@@ -2,6 +2,7 @@ import os
 import shutil
 import uuid
 from datetime import datetime, timezone
+from app.api.cloudinary_utils import upload_image_to_cloud
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -268,7 +269,7 @@ async def upload_couple_background(
     current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Tải lên ảnh nền chung cho cặp đôi"""
+    """Tải lên ảnh nền chung cho cặp đôi thẳng lên Cloudinary"""
     result = await db.execute(
         select(Couples).where(
             (Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id)
@@ -280,30 +281,25 @@ async def upload_couple_background(
         raise HTTPException(status_code=400, detail="Bạn chưa ghép đôi nên không thể cài ảnh nền!")
 
     try:
-        # Tạo file và thư mục
-        file_extension = file.filename.split(".")[-1]
-        file_name = f"bg_{uuid.uuid4()}.{file_extension}"
-        file_path = f"static/backgrounds/{file_name}"
+        # 1. GỌI SHIPPER: Giao file cho Cloudinary, bỏ vào thư mục 'lovelink/backgrounds'
+        cloud_url = upload_image_to_cloud(file.file, folder_name="lovelink/backgrounds")
         
-        os.makedirs("static/backgrounds", exist_ok=True)
-        
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        if not cloud_url:
+            raise HTTPException(status_code=400, detail="Không thể tải ảnh lên mây lúc này!")
             
-        # Cập nhật DB
-        background_url = f"/{file_path}"
-        couple.background_url = background_url
+        # 2. CẬP NHẬT DB: Ghi thẳng link mây (https://...) vào database
+        couple.background_url = cloud_url
         
         await db.commit()
         await db.refresh(couple)
         
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail="Lỗi hệ thống khi tải ảnh lên")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
         
     return {
-        "message": "Cập nhật ảnh nền thành công!", 
-        "background_url": background_url
+        "message": "Cập nhật ảnh nền mây thành công!", 
+        "background_url": cloud_url
     }
 
 
@@ -324,6 +320,7 @@ async def delete_couple_background(
         raise HTTPException(status_code=400, detail="Bạn chưa ghép đôi!")
 
     try:
+        # Chỉ cần xóa URL trong DB là màn hình sẽ tự động mất ảnh
         couple.background_url = None
         await db.commit()
     except Exception as e:

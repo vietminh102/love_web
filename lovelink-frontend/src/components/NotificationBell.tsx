@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell,Trash2, X} from 'lucide-react';
+import { Bell, Trash2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
@@ -17,7 +17,10 @@ interface AppNotification {
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const VITE_API_URL = import.meta.env.VITE_API_URL;
+  
+  // 🌟 ĐÃ SỬA LỖI TẠI ĐÂY: Thêm fallback để VITE_API_URL không bao giờ bị undefined
+  const VITE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  
   const token = localStorage.getItem('token');
   const navigate = useNavigate(); // 🌟 Khởi tạo hook chuyển trang
 
@@ -54,7 +57,7 @@ export default function NotificationBell() {
     return () => {
       ws.close();
     };
-  }, [token]);
+  }, [token, VITE_API_URL]);
 
   // 🌟 HÀM XỬ LÝ KHI CLICK VÀO 1 THÔNG BÁO
   const handleNotificationClick = async (notif: AppNotification) => {
@@ -80,7 +83,8 @@ export default function NotificationBell() {
     // Bước D: Đóng khay thông báo lại
     setShowDropdown(false);
   };
-// HÀM XỬ LÝ XÓA TỪNG THÔNG BÁO LẺ
+
+  // HÀM XỬ LÝ XÓA TỪNG THÔNG BÁO LẺ
   const handleDeleteSingle = async (e: React.MouseEvent, notifId: string) => {
     e.stopPropagation(); // 🔥 QUAN TRỌNG: Ngăn chặn sự kiện click lan ra dòng thông báo (tránh bị nhảy trang hoặc đánh dấu đọc)
     
@@ -112,6 +116,7 @@ export default function NotificationBell() {
       console.error("Lỗi xóa toàn bộ thông báo:", error);
     }
   };
+
   // Đếm số thông báo chưa đọc thực tế
   const unreadCount = notifications.filter(n => !n.is_read).length;
 

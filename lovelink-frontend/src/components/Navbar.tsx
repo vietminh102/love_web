@@ -24,7 +24,7 @@ export function Navbar() {
 
         <div className="flex items-center gap-1 sm:gap-2">
           <div className="flex items-center gap-1 mr-2">
-            <NavLink to="/" className={({ isActive }) => `flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-full transition-all font-semibold text-sm ${isActive ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-600 hover:bg-white/50 hover:text-pink-500'}`}>
+            <NavLink to="/home" className={({ isActive }) => `flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-full transition-all font-semibold text-sm ${isActive ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-600 hover:bg-white/50 hover:text-pink-500'}`}>
               <Home className="w-4 h-4" /> <span className="hidden md:inline">Trang chủ</span>
             </NavLink>
             <NavLink to="/diary" className={({ isActive }) => `flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-full transition-all font-semibold text-sm ${isActive ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-600 hover:bg-white/50 hover:text-pink-500'}`}>

@@ -55,7 +55,6 @@ updateOnboarding: async (data: { display_name: string; gender: string; dob: stri
 
     const response = await apiClient.post('/auth/update-avatar', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
         'Authorization': `Bearer ${token}` 
       },
     });

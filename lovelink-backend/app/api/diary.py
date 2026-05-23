@@ -9,96 +9,14 @@ from app.db.sql import get_db
 from app.models.Couples import Couples
 from app.api.notifications import manager
 from app.models.nosql import Notification
+from app.api.cloudinary_utils import upload_image_to_cloud
 
 
-import shutil
-import uuid
-import os
+
 
 router = APIRouter()
 
-@router.post("/diaries")
-async def create_diary(
-    title: str = Form(...),
-    content: str = Form(...),
-    date: str = Form(...),
-    location: str = Form(None),
-    visibility: str = Form("couple"), # Mặc định là cả hai cùng xem
-    image: UploadFile = File(None),
-    current_user: Users = Depends(get_current_user), # BẮT BUỘC ĐĂNG NHẬP
-    db_sql: AsyncSession = Depends(get_db) # 🌟 THÊM: Gọi Database SQL để tìm cặp đôi
-):
-    image_url = None
-    
-    # 1. Xử lý lưu file ảnh
-    if image:
-        os.makedirs("static/diaries", exist_ok=True)
-        file_ext = image.filename.split(".")[-1]
-        file_name = f"{uuid.uuid4()}.{file_ext}"
-        file_path = f"static/diaries/{file_name}"
-        
-        with open(file_path, "wb+") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-            
-        image_url = f"/{file_path}"
 
-    # 2. Tạo nhật ký
-    new_diary = Diary(
-        title=title,
-        content=content,
-        date=date,
-        location=location,
-        image_url=image_url,
-        author_id=str(current_user.id),
-        visibility=visibility
-    )
-    
-    await new_diary.insert()
-    
-    # 3.XỬ LÝ BẮN THÔNG BÁO REALTIME (Chỉ báo nếu chế độ là couple)
-    if visibility == "couple":
-        # Tìm thông tin cặp đôi trong Postgres SQL
-        result = await db_sql.execute(
-            select(Couples).where(
-                (Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id)
-            )
-        )
-        couple = result.scalars().first()
-
-        # Chỉ bắn thông báo nếu đang trong trạng thái đã ghép đôi (không FA)
-        if couple and couple.user1_id and couple.user2_id:
-            current_user_id_str = str(current_user.id)
-            user1_id_str = str(couple.user1_id)
-            user2_id_str = str(couple.user2_id)
-            
-            # Xác định đối phương là ai
-            partner_id = user2_id_str if current_user_id_str == user1_id_str else user1_id_str
-
-            # Lưu bản ghi thông báo vào MongoDB
-            notif = Notification(
-                user_id=partner_id,
-                actor_name=current_user.display_name,
-                type="diary",
-                message="vừa viết một nhật ký mới đầy ngọt ngào 📝",
-                link="/diary"
-            )
-            await notif.insert()
-
-            # Bắn tín hiệu lên sóng WebSocket cho đối phương
-            await manager.send_personal_message({
-                "id": str(notif.id),
-                "actor_name": notif.actor_name,
-                "message": notif.message,
-                "type": notif.type,
-                "link": notif.link,
-                "created_at": notif.created_at.isoformat()
-            }, partner_id)
-
-    return {
-        "message": "Đã lưu nhật ký tình yêu!", 
-        "id": str(new_diary.id),
-        "image_url": image_url
-    }
 
 @router.get("/diaries")
 async def get_all_diaries(
@@ -142,6 +60,80 @@ async def get_all_diaries(
     
     return diaries
 
+@router.post("/diaries")
+async def create_diary(
+    title: str = Form(...),
+    content: str = Form(...),
+    date: str = Form(...),
+    location: str = Form(None),
+    visibility: str = Form("couple"), 
+    image: UploadFile = File(None),
+    current_user: Users = Depends(get_current_user), 
+    db_sql: AsyncSession = Depends(get_db) 
+):
+    image_url = None
+    
+    # 1. 🌟 LÊN MÂY: Xử lý lưu file ảnh bằng Cloudinary
+    if image:
+        # Giao ảnh cho shipper Cloudinary, gom vào thư mục 'lovelink/diaries'
+        cloud_url = upload_image_to_cloud(image.file, folder_name="lovelink/diaries")
+        if not cloud_url:
+            raise HTTPException(status_code=400, detail="Không thể tải ảnh đính kèm lên mây lúc này!")
+        image_url = cloud_url
+
+    # 2. Tạo nhật ký
+    new_diary = Diary(
+        title=title,
+        content=content,
+        date=date,
+        location=location,
+        image_url=image_url,
+        author_id=str(current_user.id),
+        visibility=visibility
+    )
+    
+    await new_diary.insert()
+    
+    # 3. XỬ LÝ BẮN THÔNG BÁO REALTIME (Giữ nguyên, không thay đổi gì cả)
+    if visibility == "couple":
+        result = await db_sql.execute(
+            select(Couples).where(
+                (Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id)
+            )
+        )
+        couple = result.scalars().first()
+
+        if couple and couple.user1_id and couple.user2_id:
+            current_user_id_str = str(current_user.id)
+            user1_id_str = str(couple.user1_id)
+            user2_id_str = str(couple.user2_id)
+            
+            partner_id = user2_id_str if current_user_id_str == user1_id_str else user1_id_str
+
+            notif = Notification(
+                user_id=partner_id,
+                actor_name=current_user.display_name,
+                type="diary",
+                message="vừa viết một nhật ký mới đầy ngọt ngào 📝",
+                link="/diary"
+            )
+            await notif.insert()
+
+            await manager.send_personal_message({
+                "id": str(notif.id),
+                "actor_name": notif.actor_name,
+                "message": notif.message,
+                "type": notif.type,
+                "link": notif.link,
+                "created_at": notif.created_at.isoformat()
+            }, partner_id)
+
+    return {
+        "message": "Đã lưu nhật ký tình yêu!", 
+        "id": str(new_diary.id),
+        "image_url": image_url
+    }
+
 @router.put("/diaries/{diary_id}")
 async def update_diary(
     diary_id: str,
@@ -158,20 +150,16 @@ async def update_diary(
     if not diary:
         raise HTTPException(status_code=404, detail="Không tìm thấy nhật ký")
 
-    # 2. Kiểm tra quyền (Chỉ người viết mới được sửa)
+    # 2. Kiểm tra quyền
     if diary.author_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Bạn không có quyền sửa bài viết của người ấy!")
 
-    # 3. Cập nhật ảnh mới (nếu có)
+    # 3. 🌟 LÊN MÂY: Cập nhật ảnh mới
     if image:
-        file_ext = image.filename.split(".")[-1]
-        file_name = f"{uuid.uuid4()}.{file_ext}"
-        file_path = f"static/diaries/{file_name}"
-        
-        with open(file_path, "wb+") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-            
-        diary.image_url = f"/{file_path}"
+        cloud_url = upload_image_to_cloud(image.file, folder_name="lovelink/diaries")
+        if not cloud_url:
+            raise HTTPException(status_code=400, detail="Không thể cập nhật ảnh lên mây lúc này!")
+        diary.image_url = cloud_url
 
     # 4. Cập nhật các trường text
     if title: diary.title = title
@@ -192,11 +180,13 @@ async def delete_diary(
     if not diary:
         raise HTTPException(status_code=404, detail="Không tìm thấy nhật ký")
 
-    # Chỉ người viết mới được quyền xóa
     if diary.author_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Bạn không có quyền xóa bài viết này!")
 
+    # Lưu ý: Code này sẽ xóa bài viết trong DB. Ảnh trên Cloudinary vẫn được giữ lại 
+    # (rất tốt làm phương án backup, tránh bị xóa nhầm).
     await diary.delete()
+    
     return {"message": "Đã xóa nhật ký!"}
 @router.post("/diaries/{diary_id}/like")
 async def toggle_like_diary(

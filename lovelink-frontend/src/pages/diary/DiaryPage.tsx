@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, CalendarHeart, PenLine, Quote, X, ImagePlus, MapPin, Type, Calendar as CalendarIcon, Save, MoreVertical, Edit, Trash2, Globe, Lock } from 'lucide-react';
 import apiClient from '../../services/apiClient';
-import { useAuth } from '../../contexts/AuthContext'; // Import useAuth để lấy ID người dùng
+import { useAuth } from '../../contexts/AuthContext'; 
 
 interface DiaryEntry {
   _id?: string;
@@ -12,19 +12,18 @@ interface DiaryEntry {
   content: string;
   image_url?: string;
   location?: string;
-  visibility?: string; // Thêm quyền xem
-  author_id?: number | string; // Thêm ID tác giả để biết ai được quyền sửa/xóa
+  visibility?: string; 
+  author_id?: number | string; 
   liked_by?: string[];
 }
 
 export function DiaryPage() {
   
-  const { user } = useAuth(); // Lấy thông tin user đang đăng nhập
+  const { user } = useAuth(); 
   const [isWriting, setIsWriting] = useState(false);
   const [entries, setEntries] = useState<any[]>([]);
-  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null); // State để biết đang sửa bài nào
+  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null); 
 
-  // 2. Hàm tải dữ liệu
   const fetchDiaries = async () => {
     try {
       const response = await apiClient.get('/diaries');
@@ -34,13 +33,10 @@ export function DiaryPage() {
     }
   };
   
-  // Hàm xử lý lưu (Thêm mới hoặc Cập nhật)
   const handleSaveEntry = (savedEntry: DiaryEntry, isEdit?: boolean) => {
     if (isEdit) {
-      // Nếu là sửa, tìm và thay thế bài cũ
       setEntries(prevEntries => prevEntries.map(e => e._id === savedEntry._id ? savedEntry : e));
     } else {
-      // Nếu là thêm mới, chèn vào đầu
       const newEntries = [savedEntry, ...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setEntries(newEntries);
     }
@@ -48,7 +44,6 @@ export function DiaryPage() {
     setEditingEntry(null);
   };
 
-  // Hàm xử lý xóa
   const handleDeleteEntry = async (id: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa trang nhật ký này không? Hành động này không thể hoàn tác.")) return;
     try {
@@ -60,7 +55,6 @@ export function DiaryPage() {
     }
   };
 
-  // 3. Chạy hàm này 1 lần duy nhất khi vào trang
   useEffect(() => {
     fetchDiaries();
   }, []);
@@ -104,7 +98,6 @@ export function DiaryPage() {
 
       {/* Timeline Layout */}
       <div className="w-full relative">
-        {/* The elegant vertical timeline line */}
         <div className="absolute left-6 md:left-8 top-4 bottom-0 w-0.5 bg-linear-to-b from-pink-300 via-rose-200 to-transparent opacity-60" />
 
         <div className="space-y-12 w-full">
@@ -140,8 +133,7 @@ export function DiaryPage() {
 }
 
 function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void, onSave: (entry: DiaryEntry, isEdit?: boolean) => void, initialData?: DiaryEntry | null }) {
-  // Điền dữ liệu cũ nếu đang trong chế độ Sửa
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  // 🌟 Đã xóa API_BASE_URL ở đây
   const { user } = useAuth();
   const [title, setTitle] = useState(initialData?.title || '');
   const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
@@ -160,13 +152,12 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
       formData.append('title', title);
       formData.append('content', content);
       formData.append('date', date);
-      formData.append('visibility', visibility); // Thêm trường quyền xem
+      formData.append('visibility', visibility); 
       
       if (location) formData.append('location', location.trim());
       if (imageFile) formData.append('image', imageFile);
 
       if (initialData && initialData._id) {
-        // GỌI API SỬA (PUT)
         const response = await apiClient.put(`/diaries/${initialData._id}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -174,10 +165,9 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
         onSave({
           ...initialData,
           title, content, date, location, visibility,
-          image_url: response.data?.image_url || previewUrl // Lấy URL mới nếu có đổi ảnh, không thì dùng ảnh cũ
+          image_url: response.data?.image_url || previewUrl 
         }, true);
       } else {
-        // GỌI API TẠO MỚI (POST)
         const response = await apiClient.post('/diaries', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -288,7 +278,6 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
             </div>
           </div>
 
-          {/* Ô CHỌN QUYỀN RIÊNG TƯ (Vừa thêm vào) */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
               <Globe className="w-4 h-4 text-pink-400" />
@@ -320,8 +309,9 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
             
             {previewUrl && (
               <div className="mt-2 h-32 w-full rounded-lg overflow-hidden border border-pink-200 relative shadow-sm">
+                {/* 🌟 Đã gọi trực tiếp previewUrl, không nối ghép */}
                 <img 
-                  src={previewUrl.startsWith('blob:') ? previewUrl : `${API_BASE_URL}${previewUrl}`}
+                  src={previewUrl}
                   alt="Preview" 
                   className="w-full h-full object-cover" 
                 />
@@ -383,15 +373,13 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
   const [showHearts, setShowHearts] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false); 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  // 🌟 Đã xóa API_BASE_URL ở đây
 
-  // BƯỚC 1: QUẢN LÝ DANH SÁCH NGƯỜI ĐÃ THẢ TIM THAY VÌ CHỈ BOOLEAN
   const [likedByData, setLikedByData] = useState<string[]>(entry.liked_by || []);
   
   const isAuthor = currentUserId !== undefined && entry.author_id !== undefined && String(entry.author_id) === String(currentUserId);
-  const isLiked = likedByData.includes(String(currentUserId)); // Kiểm tra xem mình đã tim chưa
+  const isLiked = likedByData.includes(String(currentUserId)); 
 
-  // BƯỚC 2: HÀM HIỂN THỊ CHỮ (Ai là người thả tim)
   const renderLikeStatus = () => {
     if (likedByData.length === 0) return null;
 
@@ -415,28 +403,24 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
     return null;
   };
 
-  // BƯỚC 3: XỬ LÝ KHI BẤM NÚT TIM
   const handleLike = async () => {
     const myIdStr = String(currentUserId);
     const currentlyLiked = isLiked;
 
-    // Cập nhật giao diện lập tức (Optimistic UI)
     if (currentlyLiked) {
-      setLikedByData(prev => prev.filter(id => id !== myIdStr)); // Xóa mình khỏi danh sách
+      setLikedByData(prev => prev.filter(id => id !== myIdStr)); 
     } else {
-      setLikedByData(prev => [...prev, myIdStr]); // Thêm mình vào danh sách
+      setLikedByData(prev => [...prev, myIdStr]); 
       setShowHearts(true);
       setTimeout(() => setShowHearts(false), 2000); 
     }
 
     try {
-      // Gọi API ngầm
       if (entry._id) {
         await apiClient.post(`/diaries/${entry._id}/like`);
       }
     } catch (error) {
       console.error("Lỗi khi thả tim:", error);
-      // Nếu API lỗi, hoàn tác lại giao diện
       if (currentlyLiked) {
         setLikedByData(prev => [...prev, myIdStr]);
       } else {
@@ -519,8 +503,9 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
           {entry.image_url && (
             <div className="w-full h-55 rounded-2xl overflow-hidden mb-4 relative cursor-pointer"
             onClick={() => setSelectedImage(entry.image_url ?? null)} >
+              {/* 🌟 Đã gọi trực tiếp entry.image_url, không nối ghép */}
               <img 
-                src={`${API_BASE_URL}${entry.image_url}`} 
+                src={entry.image_url} 
                 alt={entry.title} 
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-in-out"
               />
@@ -532,10 +517,8 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
             {entry.content}
           </p>
 
-          {/* SỬA LẠI KHUNG GIAO DIỆN Ở ĐÂY ĐỂ HIỂN THỊ CHỮ */}
           <div className="flex items-center justify-between border-t border-pink-50 pt-3 mt-2 min-h-10">
             
-            {/* Cột Trái: Hiển thị trạng thái người thả tim */}
             <div className="text-sm font-medium text-pink-400 flex items-center gap-1.5 animate-in fade-in duration-300">
               {likedByData.length > 0 && (
                 <>
@@ -545,7 +528,6 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
               )}
             </div>
 
-            {/* Cột Phải: Nút thả tim */}
             <button 
               onClick={handleLike}
               className="relative flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-pink-50 transition-colors"
@@ -580,8 +562,9 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
           >
             <X className="w-6 h-6" />
           </button>
+          {/* 🌟 Đã gọi trực tiếp selectedImage, không nối ghép */}
           <img 
-            src={`${API_BASE_URL}${selectedImage}`} 
+            src={selectedImage} 
             alt="Phóng to" 
             className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
             onClick={(e) => e.stopPropagation()} 

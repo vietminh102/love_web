@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { galleryService } from '../../services/galleryService'; 
 import { Camera, Heart, Download, Trash2, X } from 'lucide-react';
 
-
 interface Photo {
   id: string;
   image_url: string;
@@ -14,12 +13,12 @@ interface Photo {
 export function GalleryPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const [uploading, setUploading] = useState(false);
   const [heartAnim, setHeartAnim] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
+  
   // Lấy ID user hiện tại để kiểm tra ai đã thả tim
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const myUserId = currentUser.id?.toString();
@@ -56,7 +55,8 @@ export function GalleryPage() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
-  //  Xử lý nháy đúp và thả tim API (Đã thêm phòng thủ mảng rỗng)
+
+  // Xử lý nháy đúp và thả tim API
   const handleLike = async (photoId: string) => {
     // 1. Kích hoạt hiệu ứng nổ tim lập tức
     setHeartAnim(photoId);
@@ -65,9 +65,7 @@ export function GalleryPage() {
     // 2. Cập nhật UI tạm thời
     setPhotos(photos.map(p => {
       if (p.id === photoId) {
-        
         const safeLikes = p.likes || []; 
-        
         const isLiked = safeLikes.includes(myUserId);
         const newLikes = isLiked 
           ? safeLikes.filter(id => id !== myUserId) 
@@ -85,18 +83,20 @@ export function GalleryPage() {
       console.error("Lỗi thả tim");
     }
   };
-// HÀM GIẢ LẬP DOUBLE TAP DÀNH RIÊNG CHO ĐIỆN THOẠI
+
+  // HÀM GIẢ LẬP DOUBLE TAP DÀNH RIÊNG CHO ĐIỆN THOẠI
   const handleTouchEnd = (photoId: string) => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300; // Khoảng cách giữa 2 lần bấm tối đa là 300ms
+    const DOUBLE_TAP_DELAY = 300; 
     const lastTap = lastTapRef.current[photoId] || 0;
 
     if (now - lastTap < DOUBLE_TAP_DELAY) {
-      handleLike(photoId); // Kích hoạt thả tim nếu gõ nhanh 2 lần
+      handleLike(photoId);
     }
     lastTapRef.current[photoId] = now;
   };
-  //Hàm dịch logic hiển thị ai đã tim
+
+  // Hàm dịch logic hiển thị ai đã tim
   const renderLikeText = (likes: string[]) => {
     if (!likes || likes.length === 0) return "";
     const hasMe = likes.includes(myUserId);
@@ -106,16 +106,12 @@ export function GalleryPage() {
     return "";
   };
 
-  //Hàm tải ảnh về máy
+  // Hàm tải ảnh về máy
   const handleDownload = async (e: React.MouseEvent, url: string) => {
     e.stopPropagation(); 
     try {
-      // Ép link chuẩn ngay tại chỗ
-      const fullUrl = url.startsWith('http') 
-        ? url.replace('http://localhost:8000', API_BASE_URL) 
-        : `${API_BASE_URL}${url}`;
-        
-      const response = await fetch(`${fullUrl}?t=${new Date().getTime()}`);
+      // 🌟 Nhờ có Cloudinary, ta gọi thẳng URL luôn mà không cần ghép nối
+      const response = await fetch(`${url}?t=${new Date().getTime()}`);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -130,7 +126,7 @@ export function GalleryPage() {
     }
   };
 
-  //Hàm xóa ảnh
+  // Hàm xóa ảnh
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!window.confirm("Bạn có chắc chắn muốn xóa kỷ niệm này không?")) return;
@@ -138,20 +134,14 @@ export function GalleryPage() {
       const res = await galleryService.deletePhoto(id);
       if (res.success) {
         setPhotos(photos.filter(p => p.id !== id));
-        setSelectedPhoto(null); // Đóng lightbox nếu đang mở
+        setSelectedPhoto(null); 
       }
     } catch (error) {
       alert("Không thể xóa ảnh.");
     }
   };
 
-  // Xử lý nháy đúp thả tim (Hiệu ứng Instagram)
-  const handleDoubleClick = (photoId: string) => {
-  setHeartAnim(photoId);
-  setTimeout(() => setHeartAnim(null), 800);
-};
-
-  // Hàm tạo lưới tự động (cứ tấm thứ 1 của mỗi cụm 3 tấm sẽ to ra)
+  // Hàm tạo lưới tự động
   const getColSpan = (index: number) => {
     return index % 3 === 0 ? 'col-span-2' : 'col-span-1';
   };
@@ -168,7 +158,7 @@ export function GalleryPage() {
           <p className="text-xs text-pink-400 mt-1 italic">Nơi lưu giữ từng nhịp đập...</p>
         </div>
         
-        {/* Nút Upload gắn với Input ẩn */}
+        {/* Nút Upload */}
         <button 
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
@@ -179,7 +169,6 @@ export function GalleryPage() {
           ) : (
             <>
               <Camera className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              {/* Hiệu ứng tỏa sáng lan tỏa quanh nút */}
               <span className="absolute inset-0 rounded-full border border-pink-400 animate-ping opacity-20" />
             </>
           )}
@@ -211,14 +200,15 @@ export function GalleryPage() {
                 key={photo.id}
                 initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                onDoubleClick={() => handleLike(photo.id)}   // Giữ double click cho Máy tính
-                onTouchEnd={() => handleTouchEnd(photo.id)}    // 🌟 THÊM: Double Tap mượt mà cho Điện thoại
+                onDoubleClick={() => handleLike(photo.id)} 
+                onTouchEnd={() => handleTouchEnd(photo.id)}
                 onClick={() => setSelectedPhoto(photo)}
                 className={`relative group rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-200/50 aspect-square cursor-pointer ${getColSpan(index)}`}
               >
-                <img src={`${API_BASE_URL}${photo.image_url}`} alt="Memory" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
+                {/* 🌟 Hiển thị link ảnh thẳng, không gọt rửa */}
+                <img src={photo.image_url} alt="Memory" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
                 
-                {/* Lớp phủ thông tin khi Hover hoặc Tap trên mobile */}
+                {/* Lớp phủ thông tin */}
                 <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
                   {safeLikes.length > 0 && (
                     <div className="flex items-center gap-1.5 mb-1.5">
@@ -235,18 +225,17 @@ export function GalleryPage() {
                   </div>
                 </div>
 
-                {/* THANH CÔNG CỤ NỔI: Sửa đổi để dễ dùng trên mobile */}
+                {/* THANH CÔNG CỤ NỔI */}
                 <div className="absolute top-3 right-3 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20">
-
                   <button onClick={(e) => handleDownload(e, photo.image_url)} className="p-2 bg-black/40 hover:bg-pink-500 rounded-full text-white backdrop-blur-sm transition-colors">
                     <Download className="w-4 h-4" />
                   </button>
-                  
                   <button onClick={(e) => handleDelete(e, photo.id)} className="p-2 bg-black/40 hover:bg-red-500 rounded-full text-white backdrop-blur-sm transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                {/*  NÚT THẢ TIM  */}
+
+                {/* NÚT THẢ TIM */}
                 <div className="absolute bottom-3 right-3 z-30 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleLike(photo.id); }} 
@@ -256,7 +245,7 @@ export function GalleryPage() {
                   </button>
                 </div>
 
-                {/* Hiệu ứng tim bùng nổ khi double tap */}
+                {/* Hiệu ứng tim bùng nổ */}
                 <AnimatePresence>
                   {heartAnim === photo.id && (
                     <motion.div
@@ -287,11 +276,8 @@ export function GalleryPage() {
 
             <motion.img
               initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              src={
-                selectedPhoto.image_url.startsWith('http') 
-                  ? selectedPhoto.image_url.replace('http://localhost:8000', API_BASE_URL) 
-                  : `${API_BASE_URL}${selectedPhoto.image_url}`
-              }
+              // 🌟 Truyền thẳng link, bỏ cụm code check "startsWith('http')" lằng nhằng
+              src={selectedPhoto.image_url}
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
               onDoubleClick={() => handleLike(selectedPhoto.id)}
