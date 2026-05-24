@@ -66,7 +66,7 @@ export default function NotificationBell() {
     };
   }, [token, VITE_API_URL]);
 
-  // 🌟 HÀM XỬ LÝ KHI CLICK VÀO 1 THÔNG BÁO
+  // HÀM XỬ LÝ KHI CLICK VÀO 1 THÔNG BÁO
   const handleNotificationClick = async (notif: AppNotification) => {
     // Bước A: Cập nhật ngay lập tức trạng thái ở giao diện (Optimistic UI) cho mượt
     setNotifications(prev =>
@@ -126,6 +126,20 @@ export default function NotificationBell() {
 
   // Đếm số thông báo chưa đọc thực tế
   const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const formatTime = (isoString: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    
+   
+    return date.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
 
   return (
     <div className="relative">
@@ -192,10 +206,8 @@ export default function NotificationBell() {
                       <p className="text-sm text-gray-800">
                         <span className="font-bold text-pink-600">{notif.actor_name}</span> {notif.message}
                       </p>
-                      <span className="text-[11px] text-gray-400 mt-1 block">
-                        {new Date(notif.created_at).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} 
-                        {' - '} 
-                        {new Date(notif.created_at).toLocaleDateString('vi-VN')}
+                      <span className="text-xs text-gray-400">
+                        {formatTime(notif.created_at)}
                       </span>
                     </div>
 

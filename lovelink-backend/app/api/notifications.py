@@ -16,11 +16,15 @@ import json
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
-async def check_and_send_milestones(db_sql: AsyncSession):
+async def check_and_send_milestones(db_sql):
+    # 1. XỬ LÝ THỜI GIAN CHUẨN MỰC
     VN_TZ = timezone(timedelta(hours=7))
     now_vn = datetime.now(VN_TZ)
     today = now_vn.date()
-    start_of_today = now_vn.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Chốt mốc 00:00:00 hôm nay theo giờ VN, sau đó ép sang chuẩn UTC để query MongoDB
+    start_of_today_vn = now_vn.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today_utc = start_of_today_vn.astimezone(timezone.utc)
     
     result = await db_sql.execute(select(Couples))
     couples = result.scalars().all()
@@ -37,15 +41,24 @@ async def check_and_send_milestones(db_sql: AsyncSession):
         if not u1 or not u2:
             continue
 
+        # ==========================================
+        # PHẦN 1: KIỂM TRA & GỬI THÔNG BÁO SINH NHẬT
+        # ==========================================
         for user_chinh, doi_phuong in [(u1, u2), (u2, u1)]:
-            bday = getattr(user_chinh, 'dob', None) or getattr(user_chinh, 'dob', None)
-            if bday:
+            bday_raw = getattr(user_chinh, 'dob', None)
+            if bday_raw:
+                if isinstance(bday_raw, datetime):
+                    if bday_raw.tzinfo is None:
+                        bday_raw = bday_raw.replace(tzinfo=timezone.utc)
+                    bday = bday_raw.astimezone(VN_TZ).date()
+                else:
+                    bday = bday_raw
+
                 if bday.month == today.month and bday.day == today.day:
-                    # Kiểm tra xem hôm nay hệ thống đã gửi thông báo này chưa
                     exists = await Notification.find(
                         Notification.user_id == str(doi_phuong.id),
                         Notification.type == "birthday_milestone",
-                        Notification.created_at >= start_of_today
+                        Notification.created_at >= start_of_today_utc
                     ).first_or_none()
                     
                     if not exists:
@@ -58,75 +71,116 @@ async def check_and_send_milestones(db_sql: AsyncSession):
                         )
                         await notif.insert()
                         
-                        # Phát sóng tín hiệu Realtime trực tiếp lên màn hình đối phương
+                        # 🌟 SỬA TẠI ĐÂY: Vá lại múi giờ UTC bị mất sau khi insert
+                        notif_dt = notif.created_at
+                        if notif_dt.tzinfo is None:
+                            notif_dt = notif_dt.replace(tzinfo=timezone.utc)
+                        
+                        # Phát sóng WebSocket với thời gian chuẩn có múi giờ
                         await manager.send_personal_message({
-                            "id": str(notif.id), "actor_name": notif.actor_name, "message": notif.message,
-                            "type": notif.type, "is_read": False, "link": notif.link, "created_at": notif.created_at.isoformat()
+                            "id": str(notif.id), 
+                            "actor_name": notif.actor_name, 
+                            "message": notif.message,
+                            "type": notif.type, 
+                            "is_read": False, 
+                            "link": notif.link, 
+                            "created_at": notif_dt.isoformat() # <-- Dùng thời gian đã vá
                         }, str(doi_phuong.id))
 
-        
-        # 2. XỬ LÝ NGÀY YÊU (Sửa lỗi lệch ngày do Timezone)
+        # ==========================================
+        # PHẦN 2: KIỂM TRA & GỬI THÔNG BÁO NGÀY YÊU
+        # ==========================================
         start_date_raw = getattr(couple, 'start_date', None)
         if start_date_raw:
-            if isinstance(start_date_raw, datetime):
-                start_date = start_date_raw.astimezone(VN_TZ).date()
+            # 1. QUY ĐỔI MỌI THỨ VỀ DATETIME CÓ MÚI GIỜ VN (Đồng bộ tuyệt đối với UI)
+            if not isinstance(start_date_raw, datetime):
+                # Nếu DB vô tình lưu kiểu Date thuần, gán cho nó là 00:00:00
+                start_date_raw = datetime.combine(start_date_raw, datetime.min.time())
+            
+            # Gắn múi giờ VN vào để so sánh chuẩn xác (Vì DB PostgreSQL thường lưu naive timezone)
+            if start_date_raw.tzinfo is None:
+                start_date_exact = start_date_raw.replace(tzinfo=VN_TZ)
             else:
-                start_date = start_date_raw
+                start_date_exact = start_date_raw.astimezone(VN_TZ)
 
-            # Tính toán chính xác số ngày bên nhau
-            days_together = (today - start_date).days
-            special_days = []
+            # 🌟 2. TÍNH TOÁN BẰNG ĐỒNG HỒ (Giống hệt cách JS trên UI làm)
+            # Tính tổng số giây đã trôi qua, sau đó chia cho 86400 (số giây trong 1 ngày)
+            diff_seconds = (now_vn - start_date_exact).total_seconds()
             
-            if days_together % 100 == 0 and days_together != 0: 
-                special_days.append(days_together)
+            # Bỏ qua nếu thời gian bắt đầu ở trong tương lai
+            if diff_seconds < 0:
+                continue
+                
+            # Phép chia lấy phần nguyên (//) sẽ ép Python ra số 99 y như Frontend!
+            days_together = int(diff_seconds // 86400) 
+
+            # A. Kiểm tra mốc 100, 200, 300... ngày
+            is_special_days = (days_together % 100 == 0 and days_together != 0)
             
-            for user_nhan in [u1_id, u2_id]:
-                # A. Kỷ niệm số ngày chẵn
-                if days_together in special_days:
+            # B. Kỷ niệm Năm (Sinh nhật/Ngày kỷ niệm năm thì vẫn phải dùng Tờ lịch)
+            start_date_raw = getattr(couple, 'start_date', None)
+        if start_date_raw:
+            if not isinstance(start_date_raw, datetime):
+                start_date_raw = datetime.combine(start_date_raw, datetime.min.time())
+            
+            # 🌟 VÁ LỖI TIMEZONE: DB lưu giờ Quốc tế (UTC), phải gắn mác UTC rồi mới dịch ra VN_TZ
+            if start_date_raw.tzinfo is None:
+                start_date_raw = start_date_raw.replace(tzinfo=timezone.utc)
+            start_date_exact = start_date_raw.astimezone(VN_TZ)
+
+            # Tính toán bằng Đồng hồ (tính theo giây)
+            diff_seconds = (now_vn - start_date_exact).total_seconds()
+            
+            if diff_seconds < 0:
+                continue
+                
+            days_together = int(diff_seconds // 86400) 
+
+            # A. Kiểm tra mốc 100, 200, 300... ngày
+            is_special_days = (days_together % 100 == 0 and days_together != 0)
+            
+            # B. Kỷ niệm Năm (Vẫn phải dùng Tờ lịch)
+            start_date_calendar = start_date_exact.date()
+            is_anniversary_year = (start_date_calendar.month == today.month and start_date_calendar.day == today.day and today.year > start_date_calendar.year)
+
+            if is_special_days or is_anniversary_year:
+                for user_nhan in [u1_id, u2_id]:
+                    # Trả lại type="anniversary_milestone" để Frontend hiển thị đúng Icon
                     exists = await Notification.find(
                         Notification.user_id == user_nhan,
-                        Notification.type == f"days_{days_together}",
-                        Notification.created_at >= start_of_today
+                        Notification.type == "anniversary_milestone", 
+                        Notification.created_at >= start_of_today_utc
                     ).first_or_none()
                     
                     if not exists:
+                        if is_anniversary_year:
+                            years = today.year - start_date_calendar.year
+                            msg = f"Hôm nay là tròn trĩnh {years} năm ngày hai bạn chính thức thuộc về nhau! Happy Anniversary! 💖"
+                        else:
+                            msg = f"Chúc mừng hai bạn đã bên nhau chạm mốc hành trình {days_together} ngày yêu thương! 🎉"
+
                         notif = Notification(
                             user_id=user_nhan,
                             actor_name="LoveLink",
                             type="anniversary_milestone",
-                            message=f"Chúc mừng hai bạn đã bên nhau chạm mốc hành trình {days_together} ngày yêu thương! 🎉",
+                            message=msg,
                             link="/diary"
                         )
                         await notif.insert()
                         
-                        # Kích hoạt chuông nảy số Realtime
-                        await manager.send_personal_message({
-                            "id": str(notif.id), "actor_name": notif.actor_name, "message": notif.message,
-                            "type": notif.type, "is_read": False, "link": notif.link, "created_at": notif.created_at.isoformat()
-                        }, user_nhan)
+                        # Vá lại múi giờ UTC bị mất sau khi insert
+                        notif_dt = notif.created_at
+                        if notif_dt.tzinfo is None:
+                            notif_dt = notif_dt.replace(tzinfo=timezone.utc)
 
-                # B. Kỷ niệm số năm chẵn (Trùng ngày trùng tháng)
-                elif start_date.month == today.month and start_date.day == today.day and today.year > start_date.year:
-                    years = today.year - start_date.year
-                    exists = await Notification.find(
-                        Notification.user_id == user_nhan,
-                        Notification.type == f"years_{years}",
-                        Notification.created_at >= start_of_today
-                    ).first_or_none()
-                    
-                    if not exists:
-                        notif = Notification(
-                            user_id=user_nhan,
-                            actor_name="LoveLink",
-                            type="anniversary_milestone",
-                            message=f"Hôm nay là tròn trĩnh {years} năm ngày hai bạn chính thức thuộc về nhau! Happy Anniversary! 💖",
-                            link="/diary"
-                        )
-                        await notif.insert()
-                        
                         await manager.send_personal_message({
-                            "id": str(notif.id), "actor_name": notif.actor_name, "message": notif.message,
-                            "type": notif.type, "is_read": False, "link": notif.link, "created_at": notif.created_at.isoformat()
+                            "id": str(notif.id), 
+                            "actor_name": notif.actor_name, 
+                            "message": notif.message,
+                            "type": notif.type, 
+                            "is_read": False, 
+                            "link": notif.link, 
+                            "created_at": notif_dt.isoformat()
                         }, user_nhan)
 # TRẠM PHÁT SÓNG WEBSOCKET (Connection Manager)
 class ConnectionManager:

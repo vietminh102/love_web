@@ -1,8 +1,8 @@
 # File: app/models/nosql.py
 from beanie import Document
-from pydantic import Field
+from pydantic import Field,model_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 class Diary(Document):
@@ -39,7 +39,16 @@ class Notification(Document):
     message: str          # Nội dung: "đã thả tim ảnh của bạn", "vừa viết nhật ký mới"
     is_read: bool = False # Đã đọc chưa?
     link: Optional[str] = None # Link để bấm vào (ví dụ link tới bài nhật ký/ảnh)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    @model_validator(mode="after")
+    def ensure_utc_timezone(self):
+        """
+        Mỗi khi lấy dữ liệu từ MongoDB lên, nếu thời gian bị mất múi giờ,
+        hàm này sẽ tự động ép lại múi giờ UTC chuẩn vào đối tượng.
+        """
+        if self.created_at and self.created_at.tzinfo is None:
+            self.created_at = self.created_at.replace(tzinfo=timezone.utc)
+        return self
 
     class Settings:
         name = "notifications"
