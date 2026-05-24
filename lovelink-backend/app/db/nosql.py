@@ -2,7 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.core.config import settings
 # Tạm thời comment dòng này nếu bạn chưa tạo file models/nosql.py
-from app.models.nosql import Diary, Gallery, Notification
+from app.models.nosql import Diary, Gallery, Notification, WheelData
 
 class MongoDB:
     client: AsyncIOMotorClient = None
@@ -19,7 +19,7 @@ async def connect_to_mongo():
         mongodb.db = mongodb.client[settings.MONGODB_NAME]
         
         # 3. Kích hoạt Beanie (Đảm bảo truyền mongodb.db vào chữ database)
-        await init_beanie(database=mongodb.db, document_models=[Diary, Gallery, Notification])
+        await init_beanie(database=mongodb.db, document_models=[Diary, Gallery, Notification,WheelData])
         
         print("✅ Đã kết nối MongoDB và khởi tạo Beanie thành công!")
     except Exception as e:

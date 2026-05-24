@@ -51,6 +51,13 @@ export default function NotificationBell() {
     
     ws.onmessage = (event) => {
       const newNotif = JSON.parse(event.data);
+      if (newNotif.type === 'sync_wheel_spin') {
+        // Phát tín hiệu ra toàn trang web (để file LuckyWheelPage bắt được)
+        window.dispatchEvent(new CustomEvent('triggerWheelSpin', { 
+            detail: { prize_index: newNotif.prize_index, is_auto_delete: newNotif.is_auto_delete } 
+        }));
+        return; // Dừng luôn, không cho chạy xuống code thêm thông báo cái chuông nữa
+      }
       setNotifications(prev => [newNotif, ...prev]);
     };
 

@@ -43,3 +43,9 @@ class Notification(Document):
 
     class Settings:
         name = "notifications"
+class WheelData(Document):
+    couple_id: str
+    prizes: list
+
+    class Settings:
+        name = "wheel_configs"

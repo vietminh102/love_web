@@ -1,10 +1,12 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Home, BookOpen, Image as ImageIcon, LogOut } from 'lucide-react';
+import { Heart, Home, BookOpen, Image as ImageIcon, LogOut,Gamepad2Icon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import Music from './Music';
 import Menu from './Menu';  
+import { Link } from 'react-router-dom';
+import { Gift } from 'lucide-react';
 
 export function Navbar() {
   const location = useLocation();
@@ -33,6 +35,10 @@ export function Navbar() {
             <NavLink to="/gallery" className={({ isActive }) => `flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-full transition-all font-semibold text-sm ${isActive ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-600 hover:bg-white/50 hover:text-pink-500'}`}>
               <ImageIcon className="w-4 h-4" /> <span className="hidden md:inline">Thư viện</span>
             </NavLink>
+            <NavLink to="/wheel" className={({ isActive }) => `flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-full transition-all font-semibold text-sm ${isActive ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-600 hover:bg-white/50 hover:text-pink-500'}`}>
+              <Gamepad2Icon className="w-4 h-4" /> <span className="hidden md:inline">Trò chơi</span>
+            </NavLink>
+            
           </div>
 
           <div className="w-px h-6 bg-pink-200/60 mx-1"></div>
