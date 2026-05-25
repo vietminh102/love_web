@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Menu, X, User, Calendar, Link as LinkIcon, Check, Copy, Camera, Key, Loader2, Heart } from 'lucide-react';
+import { Menu, X, User, Calendar, Link as LinkIcon, Check, Copy, Camera, Key, Loader2, Heart, LogOut} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import { coupleService } from '../services/coupleService';
@@ -235,6 +235,7 @@ export default function UserMenu() {
                 </div>
                 Thay đổi thông tin
               </button>
+
             </div>
 
             {hasPartner && (
@@ -264,6 +265,17 @@ export default function UserMenu() {
                   </svg>
                 </div>
                 Xóa tài khoản
+              </button>
+            </div>
+            <div className="p-2 border-t border-gray-100 bg-gray-50/50">
+              <button 
+                onClick={() => {
+                  navigate('/login'); 
+                  setTimeout(() => { logout(); }, 10);
+                }}
+                className="flex items-center gap-2 text-rose-600 hover:text-white bg-white/50 hover:bg-rose-500 p-2 sm:px-4 sm:py-2 rounded-full backdrop-blur-md transition-all text-sm font-bold shadow-sm"
+              >
+                <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Thoát</span>
               </button>
             </div>
           </div>
