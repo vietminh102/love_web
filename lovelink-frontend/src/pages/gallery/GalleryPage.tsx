@@ -266,19 +266,19 @@ export function GalleryPage() {
       {/* MODAL XEM ẢNH FULLSCREEN */}
       <AnimatePresence>
         {selectedPhoto && createPortal(
-          // 🌟 ĐÃ SỬA: Đổi <div> thành <motion.div> để hiệu ứng nền đen mờ dần hoạt động
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+            // 🌟 NÂNG CẤP: Đổi z-50 thành z-[9999] để nó đè bẹp mọi thanh Navbar
+            className="fixed inset-0 z-9999 flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
             onClick={() => setSelectedPhoto(null)}
           >
-            <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 p-2 rounded-full transition-colors z-50">
+            {/* Nút X đóng ảnh */}
+            <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 p-2 rounded-full transition-colors z-9999">
               <X className="w-6 h-6" />
             </button>
 
             <motion.img
               initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              // 🌟 Truyền thẳng link, bỏ cụm code check "startsWith('http')" lằng nhằng
               src={selectedPhoto.image_url}
               className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
@@ -296,8 +296,8 @@ export function GalleryPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>, // 🌟 Nhớ đóng thẻ bằng </motion.div>
-        document.body
+          </motion.div>,
+          document.body 
         )}
       </AnimatePresence>
     </div>
