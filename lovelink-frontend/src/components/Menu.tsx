@@ -274,11 +274,13 @@ export default function UserMenu() {
                   setTimeout(() => { logout(); }, 10);
                 }}
                 className="group w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-200 hover:text-gray-800 rounded-xl transition-all duration-200 text-left"
-              > <div className="p-1.5 bg-gray-100 group-hover:bg-white rounded-lg text-gray-500 shadow-sm transition-colors">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Đăng xuất tài khoản</span>
-                  </svg>
+              > 
+                <div className="p-1.5 bg-gray-100 group-hover:bg-white rounded-lg text-gray-500 shadow-sm transition-colors">
+                  
+                  <LogOut className="w-4 h-4" /> 
                 </div>
+                
+                Đăng xuất
               </button>
             </div>
           </div>

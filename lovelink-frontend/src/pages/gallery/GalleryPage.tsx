@@ -111,7 +111,6 @@ export function GalleryPage() {
   const handleDownload = async (e: React.MouseEvent, url: string) => {
     e.stopPropagation(); 
     try {
-      // 🌟 Nhờ có Cloudinary, ta gọi thẳng URL luôn mà không cần ghép nối
       const response = await fetch(`${url}?t=${new Date().getTime()}`);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
@@ -206,7 +205,6 @@ export function GalleryPage() {
                 onClick={() => setSelectedPhoto(photo)}
                 className={`relative group rounded-3xl overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-200/50 aspect-square cursor-pointer ${getColSpan(index)}`}
               >
-                {/* 🌟 Hiển thị link ảnh thẳng, không gọt rửa */}
                 <img src={photo.image_url} alt="Memory" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
                 
                 {/* Lớp phủ thông tin */}
@@ -264,42 +262,43 @@ export function GalleryPage() {
       )}
 
       {/* MODAL XEM ẢNH FULLSCREEN */}
-      <AnimatePresence>
-        {selectedPhoto && createPortal(
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            // 🌟 NÂNG CẤP: Đổi z-50 thành z-[9999] để nó đè bẹp mọi thanh Navbar
-            className="fixed inset-0 z-9999 flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
-            onClick={() => setSelectedPhoto(null)}
-          >
-            {/* Nút X đóng ảnh */}
-            <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 p-2 rounded-full transition-colors z-9999">
-              <X className="w-6 h-6" />
-            </button>
+      {/* 🌟 ĐÃ NÂNG CẤP: Đặt AnimatePresence vào TRONG createPortal và dùng z-[9999] */}
+      {createPortal(
+        <AnimatePresence>
+          {selectedPhoto && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-9999 flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
+              onClick={() => setSelectedPhoto(null)}
+            >
+              <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 p-2 rounded-full transition-colors z-9999">
+                <X className="w-6 h-6" />
+              </button>
 
-            <motion.img
-              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              src={selectedPhoto.image_url}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={() => handleLike(selectedPhoto.id)}
-              onTouchEnd={() => handleTouchEnd(selectedPhoto.id)} 
-            />
+              <motion.img
+                initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                src={selectedPhoto.image_url}
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={() => handleLike(selectedPhoto.id)}
+                onTouchEnd={() => handleTouchEnd(selectedPhoto.id)} 
+              />
 
-            <AnimatePresence>
-              {heartAnim === selectedPhoto.id && (
-                <motion.div
-                  initial={{ scale: 0, opacity: 0 }} animate={{ scale: 2, opacity: 1 }} exit={{ scale: 3, opacity: 0 }} transition={{ duration: 0.4 }}
-                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                >
-                  <Heart className="w-24 h-24 text-rose-500 drop-shadow-[0_0_20px_rgba(225,29,72,0.5)] fill-rose-500" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>,
-          document.body 
-        )}
-      </AnimatePresence>
+              <AnimatePresence>
+                {heartAnim === selectedPhoto.id && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }} animate={{ scale: 2, opacity: 1 }} exit={{ scale: 3, opacity: 0 }} transition={{ duration: 0.4 }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  >
+                    <Heart className="w-24 h-24 text-rose-500 drop-shadow-[0_0_20px_rgba(225,29,72,0.5)] fill-rose-500" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body 
+      )}
     </div>
   );
 }
