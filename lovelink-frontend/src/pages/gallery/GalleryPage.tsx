@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { galleryService } from '../../services/galleryService'; 
 import { Camera, Heart, Download, Trash2, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface Photo {
   id: string;
@@ -264,7 +265,8 @@ export function GalleryPage() {
 
       {/* MODAL XEM ẢNH FULLSCREEN */}
       <AnimatePresence>
-        {selectedPhoto && (
+        {selectedPhoto && createPortal(
+          // 🌟 ĐÃ SỬA: Đổi <div> thành <motion.div> để hiệu ứng nền đen mờ dần hoạt động
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
@@ -294,7 +296,8 @@ export function GalleryPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </motion.div>, // 🌟 Nhớ đóng thẻ bằng </motion.div>
+        document.body
         )}
       </AnimatePresence>
     </div>
