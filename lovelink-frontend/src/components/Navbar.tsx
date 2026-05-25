@@ -83,17 +83,7 @@ export function Navbar() {
           <NotificationBell />
           <Menu />
 
-          {/* NÚT THOÁT */}
-          <button 
-            onClick={() => {
-              navigate('/login'); 
-              setTimeout(() => { logout(); }, 10);
-            }}
-            className="flex items-center gap-2 text-rose-600 hover:text-white bg-white/50 hover:bg-rose-500 p-2 sm:px-4 sm:py-2 rounded-full backdrop-blur-md transition-all text-sm font-bold shadow-sm"
-          >
-            <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Thoát</span>
-          </button>
-
+          
         </div>
       </div>
     </div>

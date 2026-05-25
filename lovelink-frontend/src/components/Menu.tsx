@@ -275,7 +275,7 @@ export default function UserMenu() {
                 }}
                 className="flex items-center gap-2 text-rose-600 hover:text-white bg-white/50 hover:bg-rose-500 p-2 sm:px-4 sm:py-2 rounded-full backdrop-blur-md transition-all text-sm font-bold shadow-sm"
               >
-                <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Thoát</span>
+                <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Đăng xuất tài khoản</span>
               </button>
             </div>
           </div>
