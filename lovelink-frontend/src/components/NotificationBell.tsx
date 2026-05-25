@@ -58,6 +58,16 @@ export default function NotificationBell() {
         }));
         return; // Dừng luôn, không cho chạy xuống code thêm thông báo cái chuông nữa
       }
+      // 🌟 2. THÊM TÍN HIỆU PHIM ẢNH (MỚI)
+      if (newNotif.type === 'sync_video') {
+        console.log("📡 TỔNG ĐÀI ĐÃ NHẬN WEBSOCKET TỪ BACKEND:", newNotif);
+        
+        // Chuyển tiếp tín hiệu này sang cho trang Rạp Chiếu Phim
+        window.dispatchEvent(new CustomEvent('sync_video_event', { 
+            detail: newNotif 
+        }));
+        return; // Dừng lại, không cho nó chạy xuống đoạn hiển thị chuông thông báo
+    }
       setNotifications(prev => [newNotif, ...prev]);
     };
 

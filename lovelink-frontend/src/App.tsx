@@ -7,6 +7,7 @@ import GalleryPage from './pages/gallery/GalleryPage';
 import { FloatingHearts } from './pages/FloatingHearts';
 import OnboardingPage from './pages/OnboardingPage';
 import  LuckyWheelPage  from './pages/game/LuckyWheelPage';
+import  WatchTogetherPage  from './pages/watch/WatchTogetherPage';
 import { Navbar } from './components/Navbar';
 
 // 1. Chốt chặn 1: Dành cho trang nội bộ (Phải đăng nhập)
@@ -71,6 +72,7 @@ function App() {
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/wheel" element={<LuckyWheelPage />} />
+            <Route path="/watch" element={<WatchTogetherPage />} />
             
           </Route>
 

@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.nosql import connect_to_mongo, close_mongo_connection
-from app.api import auth, diary, gallery, notifications, lucky_wheel
-from fastapi.staticfiles import StaticFiles
+from app.api import auth, diary, gallery, notifications, lucky_wheel,video_sync
 from app.api import couple
 import asyncio
 from app.api.notifications import check_and_send_milestones
@@ -64,6 +63,7 @@ app.include_router(diary.router)
 app.include_router(gallery.router)
 app.include_router(notifications.router)
 app.include_router(lucky_wheel.router)
+app.include_router(video_sync.router)
 
 @app.get("/")
 async def root():
