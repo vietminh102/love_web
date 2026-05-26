@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import apiClient from '../services/apiClient'; // Nhớ kiểm tra lại đường dẫn import này cho đúng với dự án của bạn
+import apiClient from '../services/apiClient'; 
 import { Pencil, X, Eraser, MousePointer2 } from 'lucide-react';
 
 export const GlobalDrawer = () => {
@@ -8,7 +8,8 @@ export const GlobalDrawer = () => {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
+  // Cập nhật cấu trúc lastPos để chứa cả tọa độ thực (local) và tọa độ đã chuẩn hóa (norm)
+  const lastPos = useRef({ localX: 0, localY: 0, normX: 0, normY: 0 });
 
   // Tự động chỉnh kích thước kính bằng đúng kích thước màn hình
   useEffect(() => {
@@ -33,11 +34,15 @@ export const GlobalDrawer = () => {
       if (!ctx || !canvas) return;
 
       if (action === 'global_draw') {
-        // Dịch ngược từ phần trăm (%) ra tọa độ pixel thực tế của máy người nhận
-        const x0 = payload.x0 * canvas.width;
-        const y0 = payload.y0 * canvas.height;
-        const x1 = payload.x1 * canvas.width;
-        const y1 = payload.y1 * canvas.height;
+        // 🌟 GIẢI MÃ TỌA ĐỘ TỪ TÂM MÀN HÌNH ĐỂ KHỚP TỶ LỆ PC & MOBILE
+        const minDim = Math.min(canvas.width, canvas.height);
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        const x0 = (payload.x0 * minDim) + centerX;
+        const y0 = (payload.y0 * minDim) + centerY;
+        const x1 = (payload.x1 * minDim) + centerX;
+        const y1 = (payload.y1 * minDim) + centerY;
 
         ctx.beginPath();
         ctx.moveTo(x0, y0);
@@ -62,17 +67,24 @@ export const GlobalDrawer = () => {
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
-  // Tính toán tọa độ theo phần trăm (%) để tương thích PC lẫn Điện thoại
+  // 🌟 CÔNG THỨC TOÁN HỌC NEO VÀO TÂM MÀN HÌNH
   const getCoordinates = (e: any) => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return { localX: 0, localY: 0, normX: 0, normY: 0 };
     
+    // Tương thích cho cả chuột PC và cảm ứng Mobile
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
+    const minDim = Math.min(canvas.width, canvas.height);
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
     return {
-      x: clientX / canvas.width,
-      y: clientY / canvas.height
+      localX: clientX, // Tọa độ thực tế để tự vẽ lên máy mình
+      localY: clientY,
+      normX: (clientX - centerX) / minDim, // Tọa độ chuẩn hóa để gửi đi
+      normY: (clientY - centerY) / minDim
     };
   };
 
@@ -84,17 +96,17 @@ export const GlobalDrawer = () => {
 
   const draw = (e: any) => {
     if (!isDrawing.current || !isDrawingMode) return;
-    // e.preventDefault(); 
     
+    // KHÔNG dùng e.preventDefault() ở đây để tránh lỗi "Unable to preventDefault..." trên điện thoại
     const newPos = getCoordinates(e);
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     
     if (ctx && canvas) {
-      // Vẽ lên màn hình của mình
+      // Vẽ lên màn hình của chính mình (dùng tọa độ thực)
       ctx.beginPath();
-      ctx.moveTo(lastPos.current.x * canvas.width, lastPos.current.y * canvas.height);
-      ctx.lineTo(newPos.x * canvas.width, newPos.y * canvas.height);
+      ctx.moveTo(lastPos.current.localX, lastPos.current.localY);
+      ctx.lineTo(newPos.localX, newPos.localY);
       ctx.strokeStyle = drawColor;
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
@@ -103,10 +115,10 @@ export const GlobalDrawer = () => {
       ctx.closePath();
     }
 
-    // Bắn tọa độ phần trăm sang máy đối phương
+    // Bắn tọa độ đã chuẩn hóa sang máy đối phương
     broadcastSignal('global_draw', { 
-      x0: lastPos.current.x, y0: lastPos.current.y, 
-      x1: newPos.x, y1: newPos.y, 
+      x0: lastPos.current.normX, y0: lastPos.current.normY, 
+      x1: newPos.normX, y1: newPos.normY, 
       color: drawColor 
     });
 
@@ -127,14 +139,14 @@ export const GlobalDrawer = () => {
       <canvas
         ref={canvasRef}
         // z-[9998] để nằm dưới Modal Ảnh Fullscreen một chút nhưng đè lên mọi thứ khác
-        className={`fixed top-0 left-0 w-screen h-screen ${isDrawingMode ? 'pointer-events-auto cursor-crosshair z-[9998]' : 'pointer-events-none z-50'}`}
-        style={{ touchAction: 'none' }}
+        className={`fixed top-0 left-0 w-screen h-screen ${isDrawingMode ? 'pointer-events-auto cursor-crosshair z-9998' : 'pointer-events-none z-50'}`}
+        style={{ touchAction: 'none' }} // Chặn cuộn trang bằng CSS thay vì JS
         onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
         onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
       />
 
       {/* 🌟 NÚT BẬT/TẮT CÔNG CỤ VẼ (TRÔI NỔI GÓC DƯỚI) */}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3">
+      <div className="fixed bottom-6 right-6 z-9999 flex flex-col items-end gap-3">
         
         {/* Hộp màu hiện ra khi bật chế độ vẽ */}
         {isDrawingMode && (
@@ -150,10 +162,10 @@ export const GlobalDrawer = () => {
             </div>
             <div className="flex gap-2">
               <button onClick={() => clearCanvas(true)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-xs transition-all">
-                <Eraser className="w-4 h-4" /> Xóa Bảng
+                <Eraser className="w-4 h-4" /> Xóa
               </button>
               <button onClick={() => setIsDrawingMode(false)} className="flex-1 flex items-center justify-center gap-1 py-2 bg-pink-100 hover:bg-pink-200 text-pink-700 font-semibold rounded-xl text-xs transition-all">
-                <MousePointer2 className="w-4 h-4" /> Chọn Lại
+                <MousePointer2 className="w-4 h-4" /> Tắt vẽ
               </button>
             </div>
           </div>

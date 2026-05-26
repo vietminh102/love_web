@@ -10,6 +10,7 @@ export default function HomePage() {
   const [partnerDob, setPartnerDob] = useState<string>('');
   const [partnerGender, setPartnerGender] = useState<string>('other');
   const [hasPartner, setHasPartner] = useState(false);
+  const [partnerAvatar, setPartnerAvatar] = useState<string | null>(null);
   
   const [startDateDB, setStartDateDB] = useState<string | null>(null);
   const [loveTime, setLoveTime] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -54,6 +55,7 @@ export default function HomePage() {
           setPartnerNames(prev => ({ ...prev, name2: data.display_name }));
           if (data.dob) setPartnerDob(data.dob);
           if (data.gender) setPartnerGender(data.gender);
+          if (data.avatar_url) setPartnerAvatar(data.avatar_url);
           
           // SỬA LOGIC Ở ĐÂY: Ưu tiên dùng ảnh nền từ Database trả về
           if (data.background_url) {
@@ -241,8 +243,7 @@ export default function HomePage() {
               <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-[3px] border-white/90 shadow-lg overflow-hidden bg-pink-100 flex items-center justify-center shrink-0">
             
                 <img 
-                  src={(user as any)?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name1)}&background=fbcfe8&color=be185d&size=150`} 
-                  alt="User Avatar" 
+                  src={(user as any)?.avatar_url ? getFullImageUrl((user as any).avatar_url) : `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name1)}&background=fbcfe8&color=be185d&size=150`}
                   className="w-full h-full object-cover" 
                 />
               </div>
@@ -266,8 +267,8 @@ export default function HomePage() {
               <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-[3px] border-white/90 shadow-lg overflow-hidden bg-pink-100 flex items-center justify-center shrink-0">
                 {hasPartner ? (
                    <img 
-                     src={`https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name2)}&background=ffe4e6&color=e11d48&size=150`} 
-                     alt="Partner Avatar" 
+                     src={partnerAvatar ? getFullImageUrl(partnerAvatar) : `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name2)}&background=ffe4e6&color=e11d48&size=150`} 
+                     alt="Partner Avatar"
                      className="w-full h-full object-cover" 
                    />
                 ) : (
