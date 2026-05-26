@@ -161,10 +161,19 @@ const WatchTogetherPage = () => {
   const startScreenShare = async () => {
     try {
       setStatusMessage("Đang khởi tạo màn hình chia sẻ...");
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: "browser", frameRate: { ideal: 24, max: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-      });
+      let stream: MediaStream;
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: "browser", frameRate: { ideal: 24, max: 30 } },
+          audio: true 
+        });
+        setStatusMessage("Đang phát phim! Hãy mở web phim để cùng xem nhé... 🎬");
+      } else {
+        // Nếu trình duyệt (như Safari trên iPhone) chặn hoàn toàn lệnh này
+        alert("Rất tiếc! Trình duyệt hoặc điện thoại (iPhone) của bạn đã khóa cứng tính năng chia sẻ màn hình trên Web. Vui lòng dùng Laptop/PC để phát phim nhé! 💕");
+        setStatusMessage("Thiết bị chặn quyền chia sẻ màn hình.");
+        return;
+      }
       setIsHost(true); 
       setStreamActive(true); 
       streamActiveRef.current = true;
