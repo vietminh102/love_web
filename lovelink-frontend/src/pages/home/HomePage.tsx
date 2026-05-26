@@ -178,13 +178,13 @@ export default function HomePage() {
   return (
     <div className="min-h-screen w-full  via-rose-200 to-red-200 relative overflow-hidden font-sans">
       <div 
-        className="absolute inset-0 z-0 transition-all duration-700 bg-contain bg-center bg-no-repeat bg-pink-100"
+        className="absolute inset-0 z-0 transition-all duration-700 bg-cover bg-center bg-no-repeat bg-pink-100"
         style={(bgImage && hasPartner) ? { backgroundImage: `url('${getFullImageUrl(bgImage)}')` } : {}}
       >
         {!(bgImage && hasPartner) && (
           <div className="absolute inset-0 bg-linear-to-br from-pink-200 via-rose-200 to-red-200" />
         )}
-      </div>
+      </div>  
 
       {(bgImage && hasPartner) && (
         <div className="absolute inset-0 z-0 bg-pink-950/20 backdrop-blur-[2px]" />
@@ -203,7 +203,7 @@ export default function HomePage() {
         ))}
       </div>
       {hasPartner && (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+        <div className="fixed bottom-22 right-6 z-50 flex flex-col gap-3">
           {bgImage && (
             <button 
               onClick={handleRemoveBg}
@@ -230,40 +230,63 @@ export default function HomePage() {
         </div>
       )}
       {/* Main Content (Đã đẩy xuống bằng pt-28 để không bị Navbar đè lên) */}
-      <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-28 pb-24 w-full h-full overflow-y-auto">
+      <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-15 pb-24 w-full h-full overflow-y-auto">
         
-        {/* Names */}
-        <div className="text-center mt-6 mb-4 z-10 relative">
-          <h1 className="text-3xl sm:text-4xl font-bold text-pink-600 drop-shadow-sm flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
-            
-            <span className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl text-pink-500/80 font-semibold tracking-wide">
-                {getRoleName(user?.gender)}
-              </span>
-              <span>{partnerNames.name1}</span>
-              <span className="text-lg sm:text-xl text-pink-400 font-medium">
-                {getAge(user?.dob)}
-              </span>
-            </span>
-            
-            <span className="text-rose-500 animate-pulse drop-shadow-md mx-1">💕</span>
-            
-            {hasPartner ? (
-              <span className="flex items-baseline gap-1.5">
-                <span className="text-xl sm:text-2xl text-pink-500/80 font-semibold tracking-wide">
-                  {getRoleName(partnerGender)}
-                </span>
-                <span>{partnerNames.name2}</span>
-                <span className="text-lg sm:text-xl text-pink-400 font-medium">
-                  {getAge(partnerDob)}
-                </span>
-              </span>
-            ) : (
-              <span className="text-pink-300">Đang tìm...</span>
-            )}
 
-          </h1>
+        <div className="w-full text-center mt-6 mb-4 z-10 relative px-1">
+          <div className="flex flex-row items-start justify-center gap-2 sm:gap-6 flex-nowrap max-w-2xl mx-auto">
+            
+            {/* Cột 1: Người dùng (Bạn) */}
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-[3px] border-white/90 shadow-lg overflow-hidden bg-pink-100 flex items-center justify-center shrink-0">
+            
+                <img 
+                  src={(user as any)?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name1)}&background=fbcfe8&color=be185d&size=150`} 
+                  alt="User Avatar" 
+                  className="w-full h-full object-cover" 
+                />
+              </div>
+              <div className="mt-2 sm:mt-3 flex flex-col items-center w-full">
+                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                  {getRoleName(user?.gender)}{partnerNames.name1}
+                </span>
+                <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                  {getAge(user?.dob)}
+                </span>
+              </div>
+            </div>
+
+            {/* Cột 2: Trái tim nhấp nháy ở giữa */}
+            <div className="shrink-0 animate-pulse drop-shadow-md mt-4 sm:mt-8 px-2">
+              <span className="text-4xl sm:text-6xl text-rose-500 animate-pulse drop-shadow-md mx-1">💕</span>
+            </div>
+
+            {/* Cột 3: Đối phương (Người ấy) */}
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-[3px] border-white/90 shadow-lg overflow-hidden bg-pink-100 flex items-center justify-center shrink-0">
+                {hasPartner ? (
+                   <img 
+                     src={`https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name2)}&background=ffe4e6&color=e11d48&size=150`} 
+                     alt="Partner Avatar" 
+                     className="w-full h-full object-cover" 
+                   />
+                ) : (
+                   <span className="text-pink-400 text-2xl sm:text-3xl font-bold">?</span>
+                )}
+              </div>
+              <div className="mt-2 sm:mt-3 flex flex-col items-center w-full">
+                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                  {hasPartner ? <>{getRoleName(partnerGender)}{partnerNames.name2}</> : "Đang tìm..."}
+                </span>
+                <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                  {hasPartner ? getAge(partnerDob) : ""}
+                </span>
+              </div>
+            </div>
+
+          </div>
         </div>
+        {/* ======================================================== */}
 
         {/* Big Heart Container */}
         <div className="relative my-8">

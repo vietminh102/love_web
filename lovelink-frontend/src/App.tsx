@@ -8,6 +8,7 @@ import { FloatingHearts } from './pages/FloatingHearts';
 import OnboardingPage from './pages/OnboardingPage';
 import  LuckyWheelPage  from './pages/game/LuckyWheelPage';
 import  WatchTogetherPage  from './pages/watch/WatchTogetherPage';
+import { GlobalDrawer } from './components/GlobalDrawer';
 import { Navbar } from './components/Navbar';
 
 // 1. Chốt chặn 1: Dành cho trang nội bộ (Phải đăng nhập)
@@ -48,6 +49,7 @@ const AppLayout = () => {
       {/* Hiệu ứng và thanh điều hướng CHỈ HIỆN ở các trang bên trong */}
       <FloatingHearts />
       <Navbar /> 
+      <GlobalDrawer />
       
       {/* Khung chứa nội dung các trang */}
       <div className="flex-1 overflow-y-auto relative z-10">
