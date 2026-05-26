@@ -248,9 +248,17 @@ export default function HomePage() {
                 />
               </div>
               <div className="mt-2 sm:mt-3 flex flex-col items-center w-full">
-                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {getRoleName(user?.gender)}{partnerNames.name1}
+                
+                <span className="text-xs sm:text-sm text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                  {getRoleName(user?.gender)}
                 </span>
+                
+                {/* Tên bản thân */}
+                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                  {partnerNames.name1}
+                </span>
+                
+                {/* Tuổi bản thân */}
                 <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
                   {getAge(user?.dob)}
                 </span>
@@ -276,9 +284,19 @@ export default function HomePage() {
                 )}
               </div>
               <div className="mt-2 sm:mt-3 flex flex-col items-center w-full">
+                
+                {hasPartner && (
+                  <span className="text-xs sm:text-sm text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                    {getRoleName(partnerGender)}
+                  </span>
+                )}
+                
+                {/* Tên chính */}
                 <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {hasPartner ? <>{getRoleName(partnerGender)}{partnerNames.name2}</> : "Đang tìm..."}
+                  {hasPartner ? partnerNames.name2 : "Đang tìm..."}
                 </span>
+                
+                {/* Tuổi */}
                 <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
                   {hasPartner ? getAge(partnerDob) : ""}
                 </span>
