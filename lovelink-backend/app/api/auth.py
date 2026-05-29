@@ -17,7 +17,7 @@ from app.core.security import get_password_hash, verify_password, create_access_
 from app.models.Users import Users
 from app.models.Couples import Couples
 from app.api.deps import get_current_user
-from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse, UpdateResponse
+from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse, UpdateResponse,EmailUpdate
 
 
 from app.api.cloudinary_utils import upload_image_to_cloud
@@ -207,7 +207,6 @@ async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
         )
     )
 
-from typing import Optional # Thêm dòng này ở đầu file nếu chưa có
 
 @router.put("/update-profile")
 async def update_profile(
@@ -339,3 +338,43 @@ async def update_user_avatar(
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu DB: {str(e)}")
 
     return {"success": True, "avatar_url": current_user.avatar_url, "user": current_user}
+
+@router.patch("/update-email")
+async def update_my_email(
+    request: EmailUpdate,
+    current_user: Users = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    new_email = request.new_email.strip()
+    
+    if "@" not in new_email:
+        raise HTTPException(status_code=400, detail="Email không hợp lệ! (Phải chứa dấu @)")
+        
+    if new_email == current_user.email:
+        return {"message": "Đây đã là email hiện tại của bạn rồi!"}
+
+    result = await db.execute(select(Users).where(Users.email == new_email))
+    if result.scalars().first():
+        raise HTTPException(status_code=400, detail="Email này đã được sử dụng bởi tài khoản khác!")
+        
+    # Cập nhật DB
+    current_user.email = new_email
+    try:
+        await db.commit()
+        await db.refresh(current_user)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Lỗi khi lưu dữ liệu cập nhật Email")
+    
+    # 🌟 BÍ KÍP CHỐNG F5: TẠO NGAY TOKEN MỚI CHỨA EMAIL MỚI
+    new_token = create_access_token(data={"sub": str(current_user.id), "email": current_user.email})
+
+    return {
+        "success": True,
+        "new_token": new_token, # 👈 Ném cái vé mới về cho Frontend
+        "message": "Đã cập nhật Email thành công!", 
+        "user": {
+            "id": str(current_user.id),
+            "email": current_user.email
+        }
+    }

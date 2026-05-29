@@ -8,7 +8,9 @@ import { FloatingHearts } from './pages/FloatingHearts';
 import OnboardingPage from './pages/OnboardingPage';
 import  LuckyWheelPage  from './pages/game/LuckyWheelPage';
 import  WatchTogetherPage  from './pages/watch/WatchTogetherPage';
+import ReminderPage from './pages/reminder/ReminderPage'; 
 import { GlobalDrawer } from './components/GlobalDrawer';
+import { AlarmOverlay } from './components/AlarmOverlay';
 import { Navbar } from './components/Navbar';
 
 // 1. Chốt chặn 1: Dành cho trang nội bộ (Phải đăng nhập)
@@ -50,6 +52,7 @@ const AppLayout = () => {
       <FloatingHearts />
       <Navbar /> 
       <GlobalDrawer />
+      <AlarmOverlay />
       
       {/* Khung chứa nội dung các trang */}
       <div className="flex-1 overflow-y-auto relative z-10">
@@ -75,6 +78,7 @@ function App() {
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/wheel" element={<LuckyWheelPage />} />
             <Route path="/watch" element={<WatchTogetherPage />} />
+            <Route path="/reminder" element={<ReminderPage />} />
             
           </Route>
 

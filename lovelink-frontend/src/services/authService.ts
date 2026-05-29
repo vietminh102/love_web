@@ -72,6 +72,11 @@ updateOnboarding: async (data: { display_name: string; gender: string; dob: stri
     });
     return response.data;
   },
+  // Thêm vào bên trong object authService của bạn
+  updateEmail: async (data: { new_email: string }) => {
+    const response = await apiClient.patch('/auth/update-email', data);
+    return response.data;
+  },
   deleteAccount: async () => {
     const token = localStorage.getItem('token');
     // Dùng phương thức DELETE cho chuẩn RESTful API

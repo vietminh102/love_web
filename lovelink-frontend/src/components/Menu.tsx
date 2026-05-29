@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Menu, X, User, Calendar, Link as LinkIcon, Check, Copy, Camera, Key, Loader2, Heart, LogOut} from 'lucide-react';
+import { Menu, X, User, Calendar, Link as LinkIcon, Check, Copy, Camera, Key, Loader2, Heart, LogOut,Mail} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import { coupleService } from '../services/coupleService';
@@ -32,6 +32,7 @@ export default function UserMenu() {
     avatarUrl: user?.avatar_url || '',
     avatarFile: null as File | null,
     displayName: user?.display_name || '',
+    email: user?.email || '',
     gender: user?.gender || 'other',
     dob: user?.dob || '',
     oldPassword: '',
@@ -120,13 +121,19 @@ export default function UserMenu() {
     if (file) setEditForm({ ...editForm, avatarUrl: URL.createObjectURL(file), avatarFile: file });
   };
 
-  const handleUpdateProfile = async () => {
+const handleUpdateProfile = async () => {
     setUpdateError('');
     if (!editForm.displayName.trim()) return setUpdateError('Tên hiển thị không được để trống!');
     if (editForm.password && !editForm.oldPassword) return setUpdateError('Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu mới!');
     
+    // 🌟 BƯỚC 1: KIỂM TRA EMAIL NGAY TỪ ĐẦU (Chặn lỗi trước khi gọi API)
+    if (editForm.email && !editForm.email.includes('@')) {
+      return setUpdateError('Email phải chứa ký tự @ hợp lệ!');
+    }
+
     setIsUpdating(true);
     try {
+      // 🌟 BƯỚC 2: CẬP NHẬT PROFILE CŨ
       const formData = new FormData();
       formData.append('display_name', editForm.displayName);
       formData.append('gender', editForm.gender);
@@ -138,17 +145,37 @@ export default function UserMenu() {
       if (editForm.avatarFile) formData.append('avatar', editForm.avatarFile);
 
       const response = await authService.updateProfile(formData);
+
+      // 🌟 BƯỚC 3: CẬP NHẬT EMAIL (Nếu người dùng có nhập và có sự thay đổi)
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      let finalEmail = currentUser.email;
+
+      if (editForm.email && editForm.email !== currentUser.email) {
+        const emailResponse = await authService.updateEmail({ new_email: editForm.email });
+        finalEmail = emailResponse.user.email; 
+        if (emailResponse.new_token) {
+          localStorage.setItem('token', emailResponse.new_token);
+        }
+      }
+
       await new Promise(resolve => setTimeout(resolve, 1500));
 
+      // 🌟 BƯỚC 4: LƯU TẤT CẢ VÀO LOCAL STORAGE & CẬP NHẬT GIAO DIỆN
       setPartnerNames(prev => ({...prev, name1: editForm.displayName}));
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      
       localStorage.setItem('user', JSON.stringify({ 
-        ...currentUser, display_name: response.user.display_name, avatar_url: response.user.avatar_url, gender: response.user.gender, dob: response.user.dob
+        ...currentUser, 
+        display_name: response.user.display_name, 
+        avatar_url: response.user.avatar_url, 
+        gender: response.user.gender, 
+        dob: response.user.dob,
+        email: finalEmail // Lưu email mới vào hệ thống
       }));
 
       setIsEditModalOpen(false);
       setEditForm(prev => ({ ...prev, password: '', oldPassword: '' }));
       alert('Đã lưu những thay đổi ngọt ngào! 💕');
+
     } catch (error: any) {
       const errorDetail = error.response?.data?.detail;
       if (Array.isArray(errorDetail)) {
@@ -281,7 +308,7 @@ export default function UserMenu() {
                 </div>
                 
                 Đăng xuất
-              </button>
+              </button>.map
             </div>
           </div>
         )}
@@ -396,6 +423,23 @@ export default function UserMenu() {
                   <User className="w-4 h-4 text-pink-400"/> Tên hiển thị
                 </label>
                 <input type="text" disabled={isUpdating} value={editForm.displayName} onChange={(e) => setEditForm({...editForm, displayName: e.target.value})} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" />
+              </div>
+
+              <div className="pt-2">
+                <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 mb-1">
+                  <Mail className="w-4 h-4 text-pink-400"/> Địa chỉ Email
+                </label>
+                <input 
+                  type="email" 
+                  disabled={isUpdating} 
+                  value={editForm.email || ''} 
+                  onChange={(e) => setEditForm({...editForm, email: e.target.value})} 
+                  placeholder="VD: nguoiycuanban@gmail.com"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" 
+                />
+                <p className="text-[10.5px] text-gray-500 mt-1 ml-1 font-medium">
+                  * Nhập Email hợp lệ (có chữ @) để kích hoạt tính năng gửi Báo thức qua hộp thư.
+                </p>
               </div>
 
               <div className="pt-2">

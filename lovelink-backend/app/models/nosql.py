@@ -13,7 +13,7 @@ class Diary(Document):
     image_url: Optional[str] = None
     
     # Tự động lấy thời gian tạo
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     author_id: str  
     visibility: str = "couple"
@@ -27,7 +27,7 @@ class Gallery(Document):
     user_id: str
     couple_id: Optional[str] = None # Cho phép null nếu user đang độc thân
     image_url: str
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     likes: List[str] = Field(default_factory=list)
 
     class Settings:
@@ -58,3 +58,16 @@ class WheelData(Document):
 
     class Settings:
         name = "wheel_configs"
+
+class Reminder(Document):
+    title: str
+    message: str
+    remind_time: datetime
+    send_email: bool = True
+    couple_id: str
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_triggered: bool = False
+
+    class Settings:
+        name = "reminders" 

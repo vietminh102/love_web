@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Home, BookOpen, Image as ImageIcon, LogOut,Gamepad2Icon, FilmIcon,MoreHorizontal } from 'lucide-react';
+import { Heart, Home, BookOpen, Image as ImageIcon, Gamepad2Icon, FilmIcon, MoreHorizontal, AlarmClock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import Music from './Music';
-import Menu from './Menu';  
-import { Link } from 'react-router-dom';
-import { Gift } from 'lucide-react';
+import Menu from './Menu';   
 
 export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+
+
 
   if (location.pathname === '/auth') return null;
 
@@ -69,6 +69,15 @@ export function Navbar() {
                   >
                     <FilmIcon className="w-4 h-4" /> <span>Xem chung</span>
                   </NavLink>
+
+                  <NavLink 
+                    to="/reminder"
+                    // 🌟 ĐÃ SỬA: Khi bấm vào thì đóng cái Menu "Thêm" lại
+                    onClick={() => setIsMoreOpen(false)}
+                    className={({ isActive }) => `flex items-center gap-3 px-4 py-3 transition-all font-semibold text-sm ${isActive ? 'bg-pink-50 text-pink-600 border-r-4 border-pink-500' : 'text-gray-600 hover:bg-pink-50 hover:text-pink-500'}`}
+                  >
+                    <AlarmClock className="w-4 h-4" /> <span>Đặt lời nhắc</span>
+                  </NavLink >
                   
                 </div>
               )}
@@ -83,7 +92,6 @@ export function Navbar() {
           <NotificationBell />
           <Menu />
 
-          
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient'; 
 import { Pencil, X, Eraser, MousePointer2 } from 'lucide-react';
 
+
 export const GlobalDrawer = () => {
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawColor, setDrawColor] = useState('#ec4899'); // Màu hồng mặc định
