@@ -33,8 +33,8 @@ async def send_reminder_email(to_email: str, title: str, message_content: str):
         await aiosmtplib.send(
             msg,
             hostname="smtp.gmail.com",
-            port=587,
-            start_tls=True,
+            port=465,
+            use_tls=True,
             username=SENDER_EMAIL,
             password=APP_PASSWORD,
         )
