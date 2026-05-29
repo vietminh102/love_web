@@ -308,7 +308,7 @@ const handleUpdateProfile = async () => {
                 </div>
                 
                 Đăng xuất
-              </button>.map
+              </button>
             </div>
           </div>
         )}
