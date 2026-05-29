@@ -1,16 +1,22 @@
-import aiosmtplib
-from email.message import EmailMessage
+import httpx
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 async def send_reminder_email(to_email: str, title: str, message_content: str):
+    # 🌟 ĐIỀN THÔNG TIN CỦA BẠN VÀO ĐÂY
+    BREVO_API_KEY = os.getenv("BREVO_API_KEY")
     SENDER_EMAIL = "thongbaolovee@gmail.com" 
-    APP_PASSWORD = "esmvdsxprewyypqb" 
 
-    msg = EmailMessage()
-    msg["From"] = f"Nhắc Nhở Tình Yêu <{SENDER_EMAIL}>"
-    msg["To"] = to_email
-    msg["Subject"] = f"⏰ Báo thức: {title}"
+    url = "https://api.brevo.com/v3/smtp/email"
     
-    # Giao diện HTML của Email cho lãng mạn
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+    
+    # Giao diện HTML giữ nguyên không thay đổi
     html_content = f"""
     <html>
         <body style="font-family: Arial, sans-serif; background-color: #fdf2f8; padding: 20px;">
@@ -27,17 +33,21 @@ async def send_reminder_email(to_email: str, title: str, message_content: str):
         </body>
     </html>
     """
-    msg.add_alternative(html_content, subtype='html')
+
+    # Đóng gói bức thư chuẩn bị gửi qua API
+    payload = {
+        "sender": {"name": "Nhắc Nhở Tình Yêu", "email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": f"⏰ Báo thức: {title}",
+        "htmlContent": html_content
+    }
 
     try:
-        await aiosmtplib.send(
-            msg,
-            hostname="smtp.gmail.com",
-            port=465,
-            use_tls=True,
-            username=SENDER_EMAIL,
-            password=APP_PASSWORD,
-        )
-        print(f"✅ Đã gửi email báo thức tới: {to_email}")
+        # Gọi API qua cổng 443 (Render không thể chặn được)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status() # Bắt lỗi nếu Brevo từ chối
+            print(f"✅ Bác bảo vệ đã dùng API bắn email tới: {to_email}")
+            
     except Exception as e:
-        print(f"❌ Lỗi khi gửi email: {e}")
+        print(f"❌ Lỗi khi gửi email qua API: {e}")
