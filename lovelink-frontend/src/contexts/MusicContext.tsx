@@ -41,7 +41,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // 🌟 1. TUYỆT CHIÊU LẤY NHẠC TRỰC TIẾP TỪ FRONTEND (Bypass 100% Cloudflare/Google)
-  useEffect(() => {
+useEffect(() => {
     const fetchAudioUrl = async () => {
       if (!currentSong.id) return;
       setIsLoadingAudio(true);
@@ -49,65 +49,73 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       setIsPlaying(false);
 
       try {
-        const instances = [
-          "https://pipedapi.kavin.rocks",
-          "https://pipedapi.tokhmi.xyz",
-          "https://pipedapi.syncpundit.io",
-          "https://pipedapi.smnz.de",
-          "https://vid.puffyan.us/api/v1/videos/"
-        ];
-
         let finalUrl = '';
 
-        for (const base of instances) {
-           try {
-              // 1. Tạo link API gốc
-              let targetUrl = base.includes('puffyan') 
-                  ? `${base}${currentSong.id}` 
-                  : `${base}/streams/${currentSong.id}`;
+        // 🚀 BƯỚC 1: DÙNG COBALT API (Trùm cuối vượt rào, tốc độ bàn thờ)
+        try {
+          const cobaltRes = await fetch("https://api.cobalt.tools/api/json", {
+            method: "POST",
+            headers: {
+              "Accept": "application/json",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              url: `https://www.youtube.com/watch?v=${currentSong.id}`,
+              isAudioOnly: true,
+              aFormat: "mp3"
+            })
+          });
+          
+          if (cobaltRes.ok) {
+            const cobaltData = await cobaltRes.json();
+            if (cobaltData && cobaltData.url) {
+              finalUrl = cobaltData.url;
+              console.log("✅ Lấy nhạc siêu tốc từ Cobalt!");
+            }
+          }
+        } catch (err) {
+           console.warn("Cobalt bận, chuyển sang đội dự phòng Piped...");
+        }
 
-              // 🌟 2. TUYỆT CHIÊU: Bọc link gốc vào một CORS Proxy miễn phí
-              // Proxy này sẽ tự động thêm giấy phép CORS vào để trình duyệt không chặn nữa
-              const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-              
-              // Gọi qua Proxy
-              const res = await fetch(proxyUrl, { cache: 'no-store' });
-              
-              if (res.ok) {
-                 const data = await res.json();
-                 
-                 if (base.includes('puffyan')) {
-                     const formats = data.adaptiveFormats || [];
-                     const audioFormat = formats.find((f: any) => f.type.includes('audio/mp4')) || formats.find((f: any) => f.type.includes('audio'));
-                     if (audioFormat && audioFormat.url) {
-                        finalUrl = audioFormat.url;
-                        break; // Lấy thành công thì thoát vòng lặp ngay
-                     }
-                 } else {
-                     const audioStreams = data.audioStreams || [];
-                     const bestStream = audioStreams.find((s: any) => s.format === 'M4A') || audioStreams[0];
-                     if (bestStream && bestStream.url) {
-                        finalUrl = bestStream.url;
-                        break; // Lấy thành công thì thoát vòng lặp ngay
-                     }
-                 }
-              }
-           } catch (err) {
-              console.warn(`⚠️ Máy chủ ${base} lỗi mạng, đang thử máy khác...`);
-           }
+        // 🚀 BƯỚC 2: DÙNG PIPED TRỰC TIẾP (Bản thân Piped không hề bị lỗi CORS)
+        if (!finalUrl) {
+          const pipedInstances = [
+            "https://pipedapi.kavin.rocks",
+            "https://pipedapi.tokhmi.xyz",
+            "https://pipedapi.syncpundit.io"
+          ];
+
+          for (const base of pipedInstances) {
+             try {
+                // GỌI THẲNG KHÔNG CẦN QUA PROXY ALLORIGINS
+                const res = await fetch(`${base}/streams/${currentSong.id}`);
+                if (res.ok) {
+                   const data = await res.json();
+                   const audioStreams = data.audioStreams || [];
+                   const bestStream = audioStreams.find((s: any) => s.format === 'M4A') || audioStreams[0];
+                   if (bestStream && bestStream.url) {
+                      finalUrl = bestStream.url;
+                      console.log(`✅ Lấy nhạc thành công từ ${base}!`);
+                      break;
+                   }
+                }
+             } catch (err) {
+                console.warn(`⚠️ Máy chủ ${base} bận...`);
+             }
+          }
         }
 
         if (finalUrl) {
-           // Có link nhạc, nạp vào thẻ <audio>
+           // Nạp đạn vào thẻ Audio
            setAudioUrl(finalUrl);
            setTimeout(() => setIsLoadingAudio(false), 800); 
         } else {
-           console.error("❌ Không lấy được nhạc do bị giới hạn mạng.");
+           console.error("❌ Mọi nỗ lực đều thất bại. Bài hát này có thể bị chặn bản quyền quá gắt.");
            setIsLoadingAudio(false);
         }
 
       } catch (error) {
-        console.error("Lỗi lấy âm thanh gốc:", error);
+        console.error("Lỗi hệ thống lấy nhạc:", error);
         setIsLoadingAudio(false);
       }
     };
