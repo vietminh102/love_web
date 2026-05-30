@@ -2,6 +2,7 @@
 from pydantic_settings import BaseSettings,SettingsConfigDict
 from dotenv import load_dotenv
 import os
+from typing import Optional
 
 load_dotenv()
 
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
     
     # JWT & Bảo mật
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-mee")
+    brevo_api_key: Optional[str] = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 ngày
     redis_url: str = "redis://localhost:6379"
