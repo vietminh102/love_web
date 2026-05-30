@@ -97,7 +97,7 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
 @router.get("/stream/{video_id}")
 async def get_audio_stream(video_id: str, request: Request):
     ydl_opts = {
-        'format': 'm4a/bestaudio/best', 
+        'format': 'bestaudio[ext=m4a]/bestaudio/best', 
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
