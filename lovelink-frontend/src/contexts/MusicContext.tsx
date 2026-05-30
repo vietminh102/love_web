@@ -21,9 +21,9 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const currentPlaylistRef = useRef(playlist);
   const isSyncingRef = useRef(false);
   const syncLockTimeoutRef = useRef<any>(null);
-
-  // KHAI BÁO BASE_URL AN TOÀN
-  const BASE_URL = apiClient.defaults.baseURL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  
+  // 🌟 BỘ NHỚ ĐỆM CHỐNG LAG GIAO DIỆN (Trị bệnh rớt click)
+  const lastTimeRef = useRef(0);
 
   useEffect(() => {
     currentSongIdRef.current = currentSong.id;
@@ -40,21 +40,76 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
-  // 1. TẠO LINK TRỰC TIẾP TỚI ĐƯỜNG ỐNG PROXY BACKEND
+  // 🌟 1. TUYỆT CHIÊU LẤY NHẠC TRỰC TIẾP TỪ FRONTEND (Bypass 100% Cloudflare/Google)
   useEffect(() => {
-    if (!currentSong.id) return;
-    setIsLoadingAudio(true);
-    setIsPlaying(false);
-    
-    // 🌟 KHÔNG CẦN GỌI API ĐỂ LẤY URL NỮA, BẮN THẲNG LINK VÀO THẺ AUDIO
-    // Trình duyệt sẽ tự động kết nối với đường ống StreamingResponse bên Backend
-    setAudioUrl(`${BASE_URL}/couple/video/stream/${currentSong.id}`);
-    
-    // Giả lập thời gian load để UI mượt mà
-    setTimeout(() => setIsLoadingAudio(false), 1500);
-  }, [currentSong.id, BASE_URL]);
+    const fetchAudioUrl = async () => {
+      if (!currentSong.id) return;
+      setIsLoadingAudio(true);
+      setAudioUrl(''); 
+      setIsPlaying(false);
 
-  // 2. TỔNG ĐÀI ĐỒNG BỘ
+      try {
+        // Mạng lưới các máy chủ dự phòng toàn cầu
+        const instances = [
+          "https://pipedapi.kavin.rocks",
+          "https://pipedapi.tokhmi.xyz",
+          "https://pipedapi.syncpundit.io",
+          "https://pipedapi.smnz.de",
+          "https://vid.puffyan.us/api/v1/videos/" // Invidious API
+        ];
+
+        let finalUrl = '';
+
+        for (const base of instances) {
+           try {
+              if (base.includes('puffyan')) {
+                 const res = await fetch(`${base}${currentSong.id}`);
+                 if (res.ok) {
+                    const data = await res.json();
+                    const formats = data.adaptiveFormats || [];
+                    const audioFormat = formats.find((f: any) => f.type.includes('audio/mp4')) || formats.find((f: any) => f.type.includes('audio'));
+                    if (audioFormat && audioFormat.url) {
+                       finalUrl = audioFormat.url;
+                       console.log("✅ Lấy nhạc thành công từ Invidious!");
+                       break;
+                    }
+                 }
+              } else {
+                 const res = await fetch(`${base}/streams/${currentSong.id}`);
+                 if (res.ok) {
+                    const data = await res.json();
+                    const audioStreams = data.audioStreams || [];
+                    const bestStream = audioStreams.find((s: any) => s.format === 'M4A') || audioStreams[0];
+                    if (bestStream && bestStream.url) {
+                       finalUrl = bestStream.url;
+                       console.log(`✅ Lấy nhạc thành công từ ${base}!`);
+                       break;
+                    }
+                 }
+              }
+           } catch (err) {
+              console.warn(`⚠️ Máy chủ ${base} bận, nhảy sang máy tiếp theo...`);
+           }
+        }
+
+        if (finalUrl) {
+           setAudioUrl(finalUrl);
+           setTimeout(() => setIsLoadingAudio(false), 800); 
+        } else {
+           console.error("❌ Tất cả máy chủ đều từ chối. Bài hát có thể bị giới hạn.");
+           setIsLoadingAudio(false);
+        }
+
+      } catch (error) {
+        console.error("Lỗi lấy âm thanh gốc:", error);
+        setIsLoadingAudio(false);
+      }
+    };
+
+    fetchAudioUrl();
+  }, [currentSong.id]);
+
+  // 🌟 2. TỔNG ĐÀI ĐỒNG BỘ
   useEffect(() => {
     const syncTimeout = setTimeout(() => { broadcastSignal('request_music_sync'); }, 1500);
 
@@ -135,14 +190,14 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       if (error.name !== 'AbortError') {
          console.warn("Trình duyệt chặn tự động phát:", error);
       }
-      setIsPlaying(false); // Sửa lỗi đĩa xoay ảo
+      setIsPlaying(false);
     }
   };
 
-const playMusic = async () => {
+  const playMusic = async () => {
     if (!audioRef.current || !currentSong.id || isSyncingRef.current || !audioUrl) return;
     try {
-      // 🌟 THÊM DÒNG NÀY: Hét lên yêu cầu tắt nhạc nền toàn trang
+      // Ép tắt nhạc nền khi bắt đầu phát bài hát
       window.dispatchEvent(new Event('stop_background_music'));
       
       await audioRef.current.play();
@@ -163,6 +218,10 @@ const playMusic = async () => {
     if (!audioRef.current || !currentSong.id || isSyncingRef.current) return;
     audioRef.current.currentTime = newTime;
     setProgress(newTime);
+    
+    // Đồng bộ cả biến nhớ đệm khi tua nhạc
+    lastTimeRef.current = newTime;
+    
     broadcastSignal('seek_music', newTime);
   };
 
@@ -202,7 +261,7 @@ const playMusic = async () => {
               const percent = (e.clientX - bounds.left) / bounds.width;
               seekMusic(percent * duration);
           }}>
-             <div className="h-full bg-gradient-to-r from-pink-400 to-rose-500 transition-all ease-linear" style={{ width: `${duration > 0 ? (progress / duration) * 100 : 0}%` }} />
+             <div className="h-full bg-linear-to-r from-pink-400 to-rose-500 transition-all ease-linear" style={{ width: `${duration > 0 ? (progress / duration) * 100 : 0}%` }} />
           </div>
           
           <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 max-w-7xl mx-auto w-full gap-4">
@@ -220,7 +279,7 @@ const playMusic = async () => {
               <button 
                 onClick={isPlaying ? pauseMusic : playMusic} 
                 disabled={isLoadingAudio || !audioUrl}
-                className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-500 rounded-full text-white shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-linear-to-br from-pink-500 to-rose-500 rounded-full text-white shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
               >
                 {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
               </button>
@@ -235,7 +294,7 @@ const playMusic = async () => {
         </div>
       )}
 
-      {/* 4. NATIVE AUDIO */}
+      {/* 🌟 4. NATIVE AUDIO (Đã tối ưu cực nhẹ) */}
       <audio
         ref={audioRef}
         src={audioUrl || undefined}
@@ -243,10 +302,18 @@ const playMusic = async () => {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={handleNextSong}
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
+        
+        // 🌟 BÍ KÍP CHỐNG RỚT CLICK: Chỉ cập nhật giao diện 1 giây/lần
+        onTimeUpdate={(e) => {
+            const currentTime = e.currentTarget.currentTime;
+            if (Math.abs(currentTime - lastTimeRef.current) >= 1) {
+                setProgress(currentTime);
+                lastTimeRef.current = currentTime;
+            }
+        }}
+        
         onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration);
-            // KHI TẢI XONG BẮT ĐẦU PHÁT VÀ XỬ LÝ ĐỒNG BỘ VÀO SAU
             if (pendingSyncRef.current) {
               e.currentTarget.currentTime = pendingSyncRef.current.time;
               if (pendingSyncRef.current.isPlaying) safePlay();
