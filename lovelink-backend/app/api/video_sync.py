@@ -98,44 +98,59 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
 @router.get("/stream/{video_id}")
 async def get_audio_stream(video_id: str):
     """
-    Sử dụng máy chủ Piped trung gian để lách 100% rào cản IP/Bot của YouTube.
-    Siêu nhẹ cho server Render, không cần dùng yt-dlp hay Cookies.
+    Hệ thống luân chuyển máy chủ thông minh.
+    Tự động nhảy sang máy chủ khác nếu máy chủ hiện tại bị quá tải.
     """
     def fetch_from_public_api():
-        # Gọi API của máy chủ trung gian chuyên bẻ khóa YouTube
-        api_url = f"https://pipedapi.kavin.rocks/streams/{video_id}"
-        response = requests.get(api_url, timeout=10)
+        # Danh sách các máy chủ Piped cực xịn trên toàn cầu
+        instances = [
+            "https://pipedapi.kavin.rocks",
+            "https://pipedapi.tokhmi.xyz",
+            "https://pipedapi.syncpundit.io",
+            "https://pipedapi.smnz.de",
+            "https://piped-api.lunar.icu",
+            "https://pipedapi.drgns.space"
+        ]
         
-        if response.status_code != 200:
-            raise Exception("Máy chủ trung chuyển đang bận, vui lòng thử lại.")
-            
-        data = response.json()
-        audio_streams = data.get("audioStreams", [])
-        
-        if not audio_streams:
-            raise Exception("Không tìm thấy luồng âm thanh.")
-
-        # Lọc lấy chất lượng m4a tốt nhất để trình duyệt nào cũng phát được
-        best_audio_url = None
-        for stream in audio_streams:
-            if stream.get("format") == "M4A":
-                best_audio_url = stream.get("url")
-                break
+        # Thử lần lượt từng máy chủ
+        for base_url in instances:
+            try:
+                api_url = f"{base_url}/streams/{video_id}"
+                # Chỉ đợi 5 giây, nếu máy chủ nào lề mề thì bỏ qua qua luôn máy khác
+                response = requests.get(api_url, timeout=5)
                 
-        # Nếu không có m4a thì lấy tạm định dạng đầu tiên
-        if not best_audio_url:
-            best_audio_url = audio_streams[0].get("url")
-            
-        return best_audio_url
+                if response.status_code == 200:
+                    data = response.json()
+                    audio_streams = data.get("audioStreams", [])
+                    
+                    if audio_streams:
+                        best_audio_url = None
+                        # Ưu tiên số 1: Lấy định dạng m4a để mọi trình duyệt đọc được
+                        for stream in audio_streams:
+                            if stream.get("format") == "M4A":
+                                best_audio_url = stream.get("url")
+                                break
+                                
+                        # Nếu không có m4a, vớt đại định dạng xịn nhất đầu tiên
+                        if not best_audio_url:
+                            best_audio_url = audio_streams[0].get("url")
+                            
+                        # Nếu lấy thành công, lập tức trả về link và kết thúc
+                        print(f"✅ Đã lấy nhạc thành công từ máy chủ: {base_url}")
+                        return best_audio_url
+                else:
+                    print(f"⚠️ Máy chủ {base_url} báo lỗi {response.status_code}. Đang chuyển...")
+            except Exception as e:
+                print(f"⚠️ Máy chủ {base_url} không phản hồi. Đang thử máy khác...")
+                continue # Tiếp tục vòng lặp sang máy chủ tiếp theo
+                
+        # Nếu đã gõ cửa toàn bộ danh sách mà vẫn không ai mở
+        raise Exception("Hiện tại tất cả hệ thống vệ tinh đều đang bận. Vui lòng thử lại sau ít phút!")
 
     try:
-        # Chạy ngầm để không chặn luồng WebSocket
         audio_url = await asyncio.to_thread(fetch_from_public_api)
-        
-        # 🌟 TUYỆT CHIÊU: Điều hướng trình duyệt tự động sang link nhạc gốc!
-        # Máy chủ Render không cần phải tốn RAM để bơm nhạc nữa
         return RedirectResponse(url=audio_url)
         
     except Exception as e:
-        print(f"❌ LỖI LẤY NHẠC TỪ API: {str(e)}")
+        print(f"❌ LỖI LẤY NHẠC CUỐI CÙNG: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
