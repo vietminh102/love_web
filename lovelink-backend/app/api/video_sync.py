@@ -101,8 +101,10 @@ async def get_audio_stream(video_id: str, request: Request):
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'cookiefile': 'cookies.txt', 
     }
-    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
