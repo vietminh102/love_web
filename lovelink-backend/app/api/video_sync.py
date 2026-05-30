@@ -96,68 +96,46 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
         return {"items": []}
 
 @router.get("/stream/{video_id}")
-async def get_audio_stream(video_id: str, request: Request):
-    # 🌟 1. TỰ ĐỘNG TÌM ĐƯỜNG DẪN TUYỆT ĐỐI CỦA FILE COOKIES
-    # Dù Render có đặt code ở đâu, dòng này cũng sẽ tự động dò ra file cookies.txt
-    root_dir = os.getcwd()
-    cookie_path = os.path.join(root_dir, "cookies.txt")
-    
-    if not os.path.exists(cookie_path):
-        print(f"⚠️ Cảnh báo: Không tìm thấy file tại {cookie_path}. Backend đang chạy KHÔNG CÓ Cookies!")
-    else:
-        print(f"✅ Đã tải thành công vé qua cửa Cookies tại: {cookie_path}")
-
-    # 🌟 2. BỌC YT-DLP VÀO HÀM RIÊNG ĐỂ KHÔNG LÀM ĐƠ WEBSOCKET
-    def fetch_audio_info():
-        ydl_opts = {
-            'format': 'bestaudio',
-            'quiet': True,
-            'no_warnings': True,
-            'skip_download': True,
-            'nocheckcertificate': True,
-            'geo_bypass': True,
-            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
+async def get_audio_stream(video_id: str):
+    """
+    Sử dụng máy chủ Piped trung gian để lách 100% rào cản IP/Bot của YouTube.
+    Siêu nhẹ cho server Render, không cần dùng yt-dlp hay Cookies.
+    """
+    def fetch_from_public_api():
+        # Gọi API của máy chủ trung gian chuyên bẻ khóa YouTube
+        api_url = f"https://pipedapi.kavin.rocks/streams/{video_id}"
+        response = requests.get(api_url, timeout=10)
+        
+        if response.status_code != 200:
+            raise Exception("Máy chủ trung chuyển đang bận, vui lòng thử lại.")
             
-            # 🌟 3. BÍ KÍP TỐI THƯỢNG: Đóng giả làm app Android để né 100% hệ thống kiểm tra Bot!
-            'extractor_args': {'youtube': ['player_client=android']},
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            return ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+        data = response.json()
+        audio_streams = data.get("audioStreams", [])
+        
+        if not audio_streams:
+            raise Exception("Không tìm thấy luồng âm thanh.")
+
+        # Lọc lấy chất lượng m4a tốt nhất để trình duyệt nào cũng phát được
+        best_audio_url = None
+        for stream in audio_streams:
+            if stream.get("format") == "M4A":
+                best_audio_url = stream.get("url")
+                break
+                
+        # Nếu không có m4a thì lấy tạm định dạng đầu tiên
+        if not best_audio_url:
+            best_audio_url = audio_streams[0].get("url")
+            
+        return best_audio_url
 
     try:
-        # Chạy hàm lấy link trong ThreadPool để server vẫn rảnh rang xử lý Xem Chung
-        info = await asyncio.to_thread(fetch_audio_info)
-        audio_url = info['url']
+        # Chạy ngầm để không chặn luồng WebSocket
+        audio_url = await asyncio.to_thread(fetch_from_public_api)
         
-        headers = info.get('http_headers', {}) 
-        
-        range_header = request.headers.get('Range')
-        if range_header:
-            headers['Range'] = range_header
-
-        r = requests.get(audio_url, headers=headers, stream=True)
-        
-        if r.status_code == 403:
-            raise Exception("YouTube đã chặn luồng IP này (Lỗi 403 Forbidden).")
-            
-        response_headers = {"Accept-Ranges": "bytes"}
-        if "content-length" in r.headers:
-            response_headers["Content-Length"] = r.headers["content-length"]
-        if "content-range" in r.headers:
-            response_headers["Content-Range"] = r.headers["content-range"]
-            
-        def generate():
-            for chunk in r.iter_content(chunk_size=65536):
-                if chunk:
-                    yield chunk
-
-        return StreamingResponse(
-            generate(),
-            status_code=r.status_code, 
-            media_type="audio/mp4",
-            headers=response_headers
-        )
+        # 🌟 TUYỆT CHIÊU: Điều hướng trình duyệt tự động sang link nhạc gốc!
+        # Máy chủ Render không cần phải tốn RAM để bơm nhạc nữa
+        return RedirectResponse(url=audio_url)
         
     except Exception as e:
-        print(f"❌ LỖI TRÍCH XUẤT NHẠC: {str(e)}") 
+        print(f"❌ LỖI LẤY NHẠC TỪ API: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
