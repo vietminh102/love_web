@@ -175,7 +175,7 @@ export const GlobalDrawer = () => {
         {/* Nút bấm tròn (Floating Action Button) */}
         <button
           onClick={() => setIsDrawingMode(!isDrawingMode)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${isDrawingMode ? 'bg-gray-800 text-white rotate-45' : 'bg-linear-to-tr from-pink-500 to-rose-400 text-white hover:scale-110 hover:shadow-pink-300/50'}`}
+          className={`-translate-y-6 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${isDrawingMode ? 'bg-gray-800 text-white rotate-45' : 'bg-linear-to-tr from-pink-500 to-rose-400 text-white hover:scale-110 hover:shadow-pink-300/50'}`}
         >
           {isDrawingMode ? <X className="w-6 h-6" /> : <Pencil className="w-6 h-6" />}
         </button>

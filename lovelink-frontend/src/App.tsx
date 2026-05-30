@@ -6,8 +6,10 @@ import DiaryPage from './pages/diary/DiaryPage';
 import GalleryPage from './pages/gallery/GalleryPage';
 import { FloatingHearts } from './pages/FloatingHearts';
 import OnboardingPage from './pages/OnboardingPage';
-import  LuckyWheelPage  from './pages/game/LuckyWheelPage';
-import  WatchTogetherPage  from './pages/watch/WatchTogetherPage';
+import LuckyWheelPage from './pages/game/LuckyWheelPage';
+import WatchTogetherPage from './pages/watch/WatchTogetherPage';
+import ListenTogetherPage from './pages/music/ListenTogetherPage';
+import { MusicProvider } from './contexts/MusicContext';
 import ReminderPage from './pages/reminder/ReminderPage'; 
 import { GlobalDrawer } from './components/GlobalDrawer';
 import { AlarmOverlay } from './components/AlarmOverlay';
@@ -15,9 +17,8 @@ import { Navbar } from './components/Navbar';
 
 // 1. Chốt chặn 1: Dành cho trang nội bộ (Phải đăng nhập)
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth(); // Nhớ lấy isLoading ra nhé
+  const { isAuthenticated, isLoading } = useAuth(); 
   
-  // Màn hình chờ siêu tốc chống lỗi F5
   if (isLoading) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-pink-50">
@@ -44,7 +45,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return !isAuthenticated ? <>{children}</> : <Navigate to="/home" replace />;
 };
 
-// TẬP TRUNG GIAO DIỆN CHUNG VÀO ĐÂY
+// 🌟 TẬP TRUNG GIAO DIỆN CHUNG VÀO ĐÂY (Đã tối ưu MusicProvider)
 const AppLayout = () => {
   return (
     <div className="w-full h-screen overflow-hidden flex flex-col relative bg-pink-50">
@@ -56,7 +57,10 @@ const AppLayout = () => {
       
       {/* Khung chứa nội dung các trang */}
       <div className="flex-1 overflow-y-auto relative z-10">
-        <Outlet /> 
+        {/* 🌟 Đặt MusicProvider ở đây: Vừa chặn lỗi nhạc ma khi logout, vừa tối ưu cuộn trang */}
+        <MusicProvider>
+          <Outlet /> 
+        </MusicProvider>
       </div>
     </div>
   );
@@ -67,7 +71,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* VÙNG 1: TRANG AUTH (Không Navbar, không tim bay) */}
+          {/* VÙNG 1: TRANG AUTH (Không Navbar, không tim bay, KHÔNG NHẠC) */}
           <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
           <Route path="/onboarding" element={<OnboardingPage />} />
 
@@ -78,8 +82,8 @@ function App() {
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/wheel" element={<LuckyWheelPage />} />
             <Route path="/watch" element={<WatchTogetherPage />} />
+            <Route path="/music" element={<ListenTogetherPage />} />
             <Route path="/reminder" element={<ReminderPage />} />
-            
           </Route>
 
           {/* Xử lý đi lạc: Gõ link bậy tự động đá về Home */}

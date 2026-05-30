@@ -205,7 +205,7 @@ export default function HomePage() {
         ))}
       </div>
       {hasPartner && (
-        <div className="fixed bottom-22 right-6 z-50 flex flex-col gap-3">
+        <div className="fixed bottom-32 right-6 z-50 flex flex-col gap-3">
           {bgImage && (
             <button 
               onClick={handleRemoveBg}
@@ -231,7 +231,7 @@ export default function HomePage() {
           />
         </div>
       )}
-      {/* Main Content (Đã đẩy xuống bằng pt-28 để không bị Navbar đè lên) */}
+      
       <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-15 pb-24 w-full h-full overflow-y-auto">
         
 

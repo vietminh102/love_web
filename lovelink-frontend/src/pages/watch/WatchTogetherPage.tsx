@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import YouTube from 'react-youtube';
 import apiClient from '../../services/apiClient';
+import { useMusic } from '../../contexts/MusicContext';
 
 const configuration = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -16,6 +17,7 @@ const WatchTogetherPage = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const ytPlayerRef = useRef<any>(null);
+  const { pauseMusic } = useMusic();
 
   // STATE WEBRTC
   const [isHost, setIsHost] = useState(false);
@@ -43,6 +45,12 @@ const WatchTogetherPage = () => {
       isSyncingRef.current = false;
     }, duration); 
   };
+  useEffect(() => {
+    // Tắt Mini Player (Nhạc đôi)
+    pauseMusic(); 
+    // Tắt luôn Nhạc nền (nếu đang chạy)
+    window.dispatchEvent(new Event('stop_background_music')); 
+  }, []);
 
   useEffect(() => {
     currentVideoIdRef.current = videoId;

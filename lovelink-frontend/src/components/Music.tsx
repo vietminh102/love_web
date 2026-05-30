@@ -5,24 +5,36 @@ import { Music, VolumeX } from 'lucide-react';
 export default function BackgroundMusic() {
   const location = useLocation();
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null); // 🌟 Chỉ dùng 1 biến duy nhất này thôi
   const hasAttemptedAutoPlay = useRef(false);
-  
-  // 🌟 THÊM BIẾN NÀY ĐỂ ĐÁNH DẤU: Đã lách luật Auto-play thành công chưa
   const hasUserInteracted = useRef(false);
 
   const safePlayMusic = async () => {
     if (audioRef.current) {
       try {
-        // Đã bỏ audioRef.current.load() để nhạc không bị tua lại từ đầu khi bật lại
         await audioRef.current.play();
         setIsPlaying(true);
-        hasUserInteracted.current = true; // Đánh dấu là đã tương tác thành công
+        hasUserInteracted.current = true;
       } catch (error) {
         setIsPlaying(false);
       }
     }
   };
+
+  // 🌟 ĐÃ SỬA: Lắng nghe tiếng hét từ WatchTogether và MusicContext
+  useEffect(() => {
+    const handleStopBgMusic = () => {
+      if (audioRef.current) {
+        audioRef.current.pause(); // Gọi đúng tên biến audioRef
+        setIsPlaying(false);      // 🌟 Cập nhật luôn UI để nút bấm chuyển về màu xám
+      }
+    };
+
+    window.addEventListener('stop_background_music', handleStopBgMusic);
+    return () => {
+      window.removeEventListener('stop_background_music', handleStopBgMusic);
+    };
+  }, []);
 
   // 1. Cố gắng tự động phát nhạc khi vừa vào trang
   useEffect(() => {
@@ -38,7 +50,6 @@ export default function BackgroundMusic() {
       if (!hasUserInteracted.current && !isPlaying && audioRef.current) {
         safePlayMusic();
       }
-      // Dù thành công hay thất bại, bắt được 1 click là tháo bẫy luôn
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('keydown', handleUserInteraction);
     };
@@ -50,11 +61,11 @@ export default function BackgroundMusic() {
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('keydown', handleUserInteraction);
     };
-  }, []); // 🌟 Đã bỏ biến [isPlaying] ra khỏi đây, useEffect này chỉ chạy lúc mới load trang
+  }, []);
 
   const toggleMusic = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    hasUserInteracted.current = true; // Người dùng tự bấm nút thì cũng tính là đã tương tác
+    hasUserInteracted.current = true;
 
     if (audioRef.current) {
       if (isPlaying) {

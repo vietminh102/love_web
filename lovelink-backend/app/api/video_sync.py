@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends,Query
+from fastapi import APIRouter, Depends,Query,HTTPException,Request
+from fastapi.responses import RedirectResponse,StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from youtubesearchpython import VideosSearch
+import requests
+
 
 from app.db.sql import get_db
 from app.models.Users import Users
@@ -91,3 +93,55 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
     except Exception as e:
         print(f"❌ Lỗi khi cào YouTube với yt-dlp: {e}")
         return {"items": []}
+
+@router.get("/stream/{video_id}")
+async def get_audio_stream(video_id: str, request: Request):
+    ydl_opts = {
+        'format': 'm4a/bestaudio/best', 
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+            audio_url = info['url']
+            
+            # 🌟 1. LẤY "CHỨNG MINH THƯ" (User-Agent) TỪ YT-DLP ĐỂ ĐÁNH LỪA YOUTUBE
+            headers = info.get('http_headers', {}) 
+            
+            # Bổ sung lệnh Tua nhạc (Range)
+            range_header = request.headers.get('Range')
+            if range_header:
+                headers['Range'] = range_header
+
+        # 🌟 2. Truyền Chứng minh thư (headers) vào requests
+        r = requests.get(audio_url, headers=headers, stream=True)
+        
+        # Nếu YouTube vẫn chặn (Lỗi 403) thì báo luôn ra màn hình để dễ sửa
+        if r.status_code == 403:
+            raise Exception("YouTube đã chặn luồng IP này (Lỗi 403 Forbidden).")
+            
+        response_headers = {"Accept-Ranges": "bytes"}
+        if "content-length" in r.headers:
+            response_headers["Content-Length"] = r.headers["content-length"]
+        if "content-range" in r.headers:
+            response_headers["Content-Range"] = r.headers["content-range"]
+            
+        def generate():
+            for chunk in r.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+
+        return StreamingResponse(
+            generate(),
+            status_code=r.status_code, # Trả về đúng code 200 hoặc 206
+            media_type="audio/mp4",
+            headers=response_headers
+        )
+        
+    except Exception as e:
+        # In thẳng lỗi ra Terminal của Backend để bạn dễ đọc
+        print(f"❌ LỖI TRÍCH XUẤT NHẠC: {str(e)}") 
+        raise HTTPException(status_code=400, detail=str(e))
