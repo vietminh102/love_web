@@ -14,18 +14,20 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   
   const [audioSrc, setAudioSrc] = useState('');
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  
+  // 🌟 TRẠNG THÁI MỚI: Nhận diện người vào sau bị chặn Autoplay
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null); 
   const pendingSyncRef = useRef<{time: number, isPlaying: boolean} | null>(null);
   
-  // 🌟 KHU VỰC REFS: Tránh lỗi re-render vòng lặp vô tận
   const currentSongRef = useRef(currentSong);
   const isPlayingRef = useRef(isPlaying);
   const progressRef = useRef(progress);
   const playlistRef = useRef(playlist);
   const isSyncingRef = useRef(false);
+  const lastTimeRef = useRef(0);
 
-  // Cập nhật Refs liên tục để EventListener luôn đọc được data mới nhất mà không bị lỗi
   useEffect(() => { currentSongRef.current = currentSong; }, [currentSong]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { progressRef.current = progress; }, [progress]);
@@ -40,11 +42,12 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentSong(hdSong);
   };
 
-  // 🌟 ĐI LẤY LINK MP3 TỪ BACKEND KHI ĐỔI BÀI
   useEffect(() => {
     if (currentSong.id) {
       setIsLoadingAudio(true);
       setAudioSrc(''); 
+      setAutoplayBlocked(false);
+
       let targetUrl = currentSong.id;
       if (!targetUrl.startsWith('http')) targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
 
@@ -65,6 +68,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     if (audioRef.current && isFinite(time)) {
       audioRef.current.currentTime = time;
       setProgress(time);
+      lastTimeRef.current = time;
     }
   };
 
@@ -73,23 +77,21 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       try { 
         await audioRef.current.play(); 
         setIsPlaying(true); 
+        setAutoplayBlocked(false); // Thành công, tắt cảnh báo
       } catch (error) { 
-        // 🌟 BẮT LỖI TRÌNH DUYỆT CẤM AUTOPLAY (Dành cho người vào sau)
-        console.warn("Trình duyệt yêu cầu bạn click vào màn hình để phát nhạc!"); 
+        console.warn("Trình duyệt cấm Autoplay, đợi user tương tác!"); 
         setIsPlaying(false); 
+        setAutoplayBlocked(true); // Bị cấm, bật cảnh báo!
       }
     }
   };
 
   const broadcastSignal = (action: string, payload: any = null) => {
-    // Nếu đang bị người khác điều khiển (isSyncingRef = true) thì TUYỆT ĐỐI KHÔNG gửi ngược lại
     if (isSyncingRef.current) return;
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
-  // 🌟 TỔNG ĐÀI ĐỒNG BỘ: CHỈ CHẠY 1 LẦN DUY NHẤT LÚC MỞ WEB
   useEffect(() => {
-    // Người mới vào phòng: Lập tức hô to hỏi xem có ai đang nghe nhạc không
     setTimeout(() => {
         apiClient.post('/couple/video/sync', { action: 'request_music_sync', payload: null }).catch(console.error);
     }, 1500);
@@ -97,7 +99,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     const handleRemoteSignaling = async (e: any) => {
       const { action, payload } = e.detail;
       
-      // 1. NGƯỜI CŨ NHẬN ĐƯỢC LỜI HỎI THĂM TỪ NGƯỜI MỚI
       if (action === 'request_music_sync') {
         if (currentSongRef.current.id && isPlayingRef.current) {
           apiClient.post('/couple/video/sync', { 
@@ -106,10 +107,8 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           }).catch(console.error);
         }
       }
-      
-      // 2. NGƯỜI MỚI NHẬN ĐƯỢC CÂU TRẢ LỜI ĐỂ CẬP NHẬT GIAO DIỆN
       else if (action === 'sync_music_state') {
-        isSyncingRef.current = true; // Bật khóa cấm phản dame
+        isSyncingRef.current = true; 
         setPlaylist(payload.playlist || []);
         
         if (currentSongRef.current.id !== payload.song.id) {
@@ -119,10 +118,8 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           safeSeek(payload.time);
           if (payload.isPlaying) safePlay(); else { audioRef.current?.pause(); setIsPlaying(false); }
         }
-        setTimeout(() => { isSyncingRef.current = false; }, 1000); // Tắt khóa
+        setTimeout(() => { isSyncingRef.current = false; }, 1000); 
       }
-      
-      // 3. ĐỒNG BỘ ĐỔI BÀI HÁT
       else if (action === 'change_song') {
         isSyncingRef.current = true; setSongHD(payload); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       } 
@@ -132,8 +129,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       else if (action === 'add_to_playlist') {
         setPlaylist(prev => [...prev, payload]);
       }
-      
-      // 4. ĐỒNG BỘ PLAY / PAUSE / TUA NHẠC
       else if (action === 'play_music') {
         isSyncingRef.current = true; safeSeek(payload); safePlay(); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       } 
@@ -149,25 +144,26 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener('sync_video_event', handleRemoteSignaling);
   }, []); 
 
-  // KHI ĐÃ CÓ LINK MP3
   useEffect(() => {
     if (audioSrc && audioRef.current) {
-      if (pendingSyncRef.current) {
-        safeSeek(pendingSyncRef.current.time);
-        if (pendingSyncRef.current.isPlaying) safePlay();
-        pendingSyncRef.current = null;
-      } else {
+      // Chỉ phát nếu KHÔNG CÓ lệnh chờ đồng bộ (Lệnh chờ sẽ được xử lý ở onLoadedMetadata bên dưới)
+      if (!pendingSyncRef.current) {
         safePlay(); 
       }
     }
   }, [audioSrc]);
 
-  // HÀM NGƯỜI DÙNG BẤM
   const playMusic = () => {
     if (!audioSrc) return;
     window.dispatchEvent(new Event('stop_background_music'));
-    safePlay();
-    broadcastSignal('play_music', audioRef.current?.currentTime || 0);
+    
+    // 🌟 Nếu người dùng đang bị chặn Autoplay, chỉ mở nhạc nội bộ để đuổi kịp phòng, KHÔNG BÁO LÊN MẠNG
+    if (autoplayBlocked) {
+      safePlay();
+    } else {
+      safePlay();
+      broadcastSignal('play_music', audioRef.current?.currentTime || 0);
+    }
   };
 
   const pauseMusic = () => {
@@ -201,14 +197,29 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       changeSongNow: (song: any) => { setSongHD(song); broadcastSignal('change_song', song); }
     }}>
       
+      {/* 🌟 THẺ AUDIO ĐƯỢC BỌC THÉP TÍNH NĂNG TUA */}
       {audioSrc && (
         <audio
           ref={audioRef}
           src={audioSrc}
-          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+          preload="auto" // Ép trình duyệt tải trước để tua mượt
+          onLoadedMetadata={(e) => {
+            setDuration(e.currentTarget.duration);
+            // KHI VỪA TẢI XONG METADATA, THỰC HIỆN TUA THEO LỆNH NGƯỜI ĐI TRƯỚC
+            if (pendingSyncRef.current) {
+              e.currentTarget.currentTime = pendingSyncRef.current.time;
+              setProgress(pendingSyncRef.current.time);
+              lastTimeRef.current = pendingSyncRef.current.time;
+              if (pendingSyncRef.current.isPlaying) safePlay();
+              pendingSyncRef.current = null;
+            }
+          }}
           onTimeUpdate={(e) => {
-            // Không bao giờ được phép gửi broadcast tự động trong hàm này!
-            setProgress(e.currentTarget.currentTime);
+            const time = e.currentTarget.currentTime;
+            if (Math.abs(time - lastTimeRef.current) >= 1) {
+              setProgress(time);
+              lastTimeRef.current = time;
+            }
           }}
           onEnded={handleNextSong}
         />
@@ -221,6 +232,18 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       {currentSong.id && (
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
+          {/* Cảnh báo nhấp nháy cho người vào sau */}
+          {autoplayBlocked && (
+            <div className="absolute -top-10 right-4 bg-pink-500 text-white text-[11px] px-3 py-1.5 rounded-full shadow-lg font-medium animate-bounce flex items-center gap-2">
+               <span className="relative flex h-2 w-2">
+                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                 <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+               </span>
+               Nhấn Play để đồng bộ phòng
+               <div className="absolute -bottom-1.5 right-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-pink-500"></div>
+            </div>
+          )}
+
           <div className="w-full h-1 bg-gray-100 cursor-pointer" onClick={(e) => {
               if (duration === 0 || isLoadingAudio) return; 
               const bounds = e.currentTarget.getBoundingClientRect();
@@ -247,7 +270,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
               <button 
                 onClick={isPlaying ? pauseMusic : playMusic} 
                 disabled={isLoadingAudio} 
-                className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${isLoadingAudio ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'}`}
+                className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${isLoadingAudio ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'} ${autoplayBlocked ? 'ring-4 ring-pink-300 animate-pulse' : ''}`}
               >
                 {isLoadingAudio ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
