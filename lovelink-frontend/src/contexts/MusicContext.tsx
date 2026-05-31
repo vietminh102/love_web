@@ -13,8 +13,9 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const [duration, setDuration] = useState(0);
   const [playlist, setPlaylist] = useState<any[]>([]);
 
+  // 🌟 Đánh lừa TypeScript
+  const Player: any = ReactPlayer; 
   const playerRef = useRef<any>(null); 
-  const Player: any = ReactPlayer;
   const pendingSyncRef = useRef<{time: number, isPlaying: boolean} | null>(null);
   
   const currentSongIdRef = useRef(currentSong.id);
@@ -38,7 +39,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
-  // TỔNG ĐÀI ĐỒNG BỘ
   useEffect(() => {
     const syncTimeout = setTimeout(() => { broadcastSignal('request_music_sync'); }, 1500);
 
@@ -50,7 +50,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           try {
             broadcastSignal('sync_music_state', { 
               song: currentSong, 
-              time: playerRef.current.getCurrentTime() || 0, 
+              time: progress, // 🌟 TRỊ BỆNH CRASH: Dùng thẳng progress, không gọi getCurrentTime() nữa
               isPlaying: isPlaying, 
               playlist: currentPlaylistRef.current 
             });
@@ -107,19 +107,19 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       clearTimeout(syncTimeout);
       window.removeEventListener('sync_video_event', handleRemoteSignaling);
     };
-  }, [currentSong, isPlaying]); 
+  }, [currentSong, isPlaying, progress]); 
 
   const playMusic = () => {
     if (!playerRef.current || !currentSong.id || isSyncingRef.current) return;
     window.dispatchEvent(new Event('stop_background_music'));
     setIsPlaying(true);
-    broadcastSignal('play_music', playerRef.current.getCurrentTime() || 0);
+    broadcastSignal('play_music', progress); // 🌟 Dùng progress để chống văng lỗi
   };
 
   const pauseMusic = () => {
     if (!playerRef.current || !currentSong.id || isSyncingRef.current) return;
     setIsPlaying(false);
-    broadcastSignal('pause_music', playerRef.current.getCurrentTime() || 0);
+    broadcastSignal('pause_music', progress); // 🌟 Dùng progress để chống văng lỗi
   };
 
   const seekMusic = (newTime: number) => {
@@ -150,6 +150,11 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     broadcastSignal('change_song', song);
   };
 
+  // 🌟 TRỊ BỆNH ẢNH MỜ: Tự động "độ" ảnh HD của SoundCloud
+  const highResThumbnail = currentSong.thumbnail 
+    ? currentSong.thumbnail.replace('-large.jpg', '-t500x500.jpg') 
+    : '';
+
   return (
     <MusicContext.Provider value={{ 
       currentSong, isPlaying, progress, duration, playlist,
@@ -162,14 +167,14 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       {currentSong.id && (
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
-          {/* 🌟 SOUNDCLOUD PLAYER TÀNG HÌNH */}
-<div style={{ display: 'none' }}>
+          {/* 🌟 TRỊ BỆNH TẮT TIẾNG: Tàng hình đúng chuẩn HTML để trình duyệt không đóng băng */}
+          <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
              <Player
                 ref={playerRef}
                 url={currentSong.id} 
                 playing={isPlaying}
-                width="0"
-                height="0"
+                width="10px"
+                height="10px"
                 onReady={() => {
                   if (pendingSyncRef.current) {
                     playerRef.current?.seekTo(pendingSyncRef.current.time, 'seconds');
@@ -204,9 +209,12 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           
           <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 max-w-7xl mx-auto w-full gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
+              
               <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
-                <img src={currentSong.thumbnail} alt="cover" className="w-full h-full object-cover" />
+                {/* 🌟 Nạp ảnh HD nét căng vào đây */}
+                <img src={highResThumbnail} alt="cover" className="w-full h-full object-cover" />
               </div>
+              
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-sm sm:text-base text-gray-800 truncate">{currentSong.title}</span>
                 <span className="text-xs text-pink-500 truncate">{currentSong.channel}</span>
