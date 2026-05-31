@@ -17,3 +17,12 @@ lovelink-frontend/.env
 # Bỏ qua file log và hệ điều hành
 *.log
 .DS_Store
+
+**/node_modules/
+**/dist/
+**/build/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+**/.env

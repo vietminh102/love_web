@@ -95,3 +95,26 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
         print(f"❌ Lỗi khi cào YouTube với yt-dlp: {e}")
         return {"items": []}
 
+@router.get("/search/soundcloud")
+async def search_soundcloud(q: str = Query(..., description="Từ khóa tìm kiếm SoundCloud")):
+    def fetch_soundcloud_data():
+        ydl_opts = {'format': 'best', 'extract_flat': True, 'quiet': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(f"scsearch5:{q}", download=False)
+
+    try:
+        result = await asyncio.to_thread(fetch_soundcloud_data)
+        formatted_results = []
+        if 'entries' in result:
+            for entry in result['entries']:
+                if not entry: continue
+                formatted_results.append({
+                    "videoId": entry.get("url"), # SoundCloud dùng URL trực tiếp làm ID
+                    "title": entry.get("title", "Không tiêu đề"),
+                    "channel": entry.get("uploader", "SoundCloud Artist"),
+                    "thumbnail": entry.get("thumbnails", [{}])[0].get("url")
+                })
+        return {"items": formatted_results}
+    except Exception as e:
+        print(f"❌ Lỗi tìm kiếm SoundCloud: {e}")
+        return {"items": []}

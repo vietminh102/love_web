@@ -29,3 +29,15 @@ dist-ssr
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Chặn thư viện JS/React
+node_modules/
+dist/
+build/
+
+# Chặn rác của Python Backend
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/

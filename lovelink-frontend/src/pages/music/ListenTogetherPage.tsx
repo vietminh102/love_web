@@ -18,7 +18,7 @@ const ListenTogetherPage = () => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     try {
-      const response = await apiClient.get(`/couple/video/search?q=${encodeURIComponent(searchQuery + ' audio')}`);
+      const response = await apiClient.get(`/couple/video/search/soundcloud?q=${encodeURIComponent(searchQuery + ' audio')}`);
       if (response.data && response.data.items) setSearchResults(response.data.items);
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
