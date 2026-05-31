@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
-// 🌟 Thêm icon X để làm nút tắt
 import { Play, Pause, SkipForward, Loader2, X } from 'lucide-react';
 import apiClient from '../services/apiClient';
 
@@ -19,6 +18,9 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
 
   const audioRef = useRef<HTMLAudioElement>(null); 
   const pendingSyncRef = useRef<{time: number, isPlaying: boolean} | null>(null);
+  
+  // 🌟 VŨ KHÍ MỚI: KHO CHỨA LINK NHẠC TẢI TRƯỚC
+  const urlCache = useRef<Record<string, string>>({});
   
   const currentSongRef = useRef(currentSong);
   const isPlayingRef = useRef(isPlaying);
@@ -41,23 +43,47 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentSong(hdSong);
   };
 
+  // 🌟 HÀM ÂM THẦM ĐI LẤY LINK BÀI TIẾP THEO
+  const preloadAudio = (songId: string) => {
+    if (!songId || urlCache.current[songId]) return;
+    let targetUrl = songId;
+    if (!targetUrl.startsWith('http')) targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
+    apiClient.get(`/couple/music/stream-url?url=${encodeURIComponent(targetUrl)}`)
+      .then(res => { 
+        if (res.data && res.data.stream_url) urlCache.current[songId] = res.data.stream_url; 
+      }).catch(err => console.error("Lỗi preload:", err));
+  };
+
+  // 🌟 THEO DÕI PLAYLIST: Thấy có bài mới là âm thầm tải trước ngay
+  useEffect(() => {
+    if (playlist.length > 0) preloadAudio(playlist[0].id);
+  }, [playlist]);
+
   useEffect(() => {
     if (currentSong.id) {
-      setIsLoadingAudio(true);
-      setAudioSrc(''); 
-      setAutoplayBlocked(false);
+      // Nếu đã có sẵn trong kho thì lấy ra dùng luôn (Nhanh như chớp)
+      if (urlCache.current[currentSong.id]) {
+        setAudioSrc(urlCache.current[currentSong.id]);
+        setIsLoadingAudio(false);
+        setAutoplayBlocked(false);
+      } else {
+        // Nếu chưa có thì đành phải tải từ từ
+        setIsLoadingAudio(true);
+        setAudioSrc(''); 
+        setAutoplayBlocked(false);
+        let targetUrl = currentSong.id;
+        if (!targetUrl.startsWith('http')) targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
 
-      let targetUrl = currentSong.id;
-      if (!targetUrl.startsWith('http')) targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
-
-      apiClient.get(`/couple/music/stream-url?url=${encodeURIComponent(targetUrl)}`)
-        .then(res => {
-          if (res.data && res.data.stream_url) {
-            setAudioSrc(res.data.stream_url); 
-          }
-        })
-        .catch(err => console.error("Lỗi lấy audio:", err))
-        .finally(() => setIsLoadingAudio(false));
+        apiClient.get(`/couple/music/stream-url?url=${encodeURIComponent(targetUrl)}`)
+          .then(res => {
+            if (res.data && res.data.stream_url) {
+              setAudioSrc(res.data.stream_url); 
+              urlCache.current[currentSong.id] = res.data.stream_url; // Cất vào kho
+            }
+          })
+          .catch(err => console.error("Lỗi lấy audio:", err))
+          .finally(() => setIsLoadingAudio(false));
+      }
     } else {
       setAudioSrc('');
     }
@@ -142,7 +168,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
         isSyncingRef.current = true; safeSeek(payload); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       }
       else if (action === 'stop_music') {
-        // Lệnh từ partner yêu cầu tắt hẳn nhạc
         isSyncingRef.current = true; 
         audioRef.current?.pause();
         setCurrentSong({ id: '', title: '', channel: '', thumbnail: '' });
@@ -194,19 +219,29 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     if (playlist.length > 0) {
       const nextSong = playlist[0];
       const remainingPlaylist = playlist.slice(1);
+      
+      // 🌟 KỸ THUẬT HOT-SWAP (TRÁO ĐĨA THẦN TỐC CHO ĐIỆN THOẠI)
+      const cachedSrc = urlCache.current[nextSong.id];
+      if (cachedSrc && audioRef.current) {
+         // Đưa thẳng link vào DOM bỏ qua React, và gọi play ngay lập tức trong luồng onEnded
+         audioRef.current.src = cachedSrc;
+         audioRef.current.play().then(() => {
+             setIsPlaying(true);
+             setAutoplayBlocked(false);
+         }).catch(() => setAutoplayBlocked(true));
+         setAudioSrc(cachedSrc);
+      }
+
       setSongHD(nextSong); 
       setPlaylist(remainingPlaylist);
       broadcastSignal('play_next_song', { nextSong, remainingPlaylist });
     }
   };
 
-  // 🌟 HÀM TẮT TRẠM PHÁT NHẠC
   const closePlayer = () => {
-    // Tạm dừng và gửi lệnh tắt sang cho Partner
     audioRef.current?.pause();
     broadcastSignal('stop_music', null);
     
-    // Dọn dẹp sạch sẽ giao diện local
     setCurrentSong({ id: '', title: '', channel: '', thumbnail: '' });
     setAudioSrc('');
     setPlaylist([]);
@@ -226,7 +261,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           ref={audioRef}
           src={audioSrc}
           preload="auto" 
-          autoPlay={isPlaying} // 🌟 VŨ KHÍ TRỊ MOBILE: Ép điện thoại hiểu là đang trong luồng phát tự động
+          autoPlay={isPlaying}
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration);
           }}
@@ -238,7 +273,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
               if (pendingSyncRef.current.isPlaying) safePlay();
               pendingSyncRef.current = null;
             } else if (isPlayingRef.current) {
-              // Ép phát bù cho mobile nếu bị khựng
               safePlay();
             }
           }}
@@ -289,17 +323,17 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
               
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-sm sm:text-base text-gray-800 truncate pr-2">{currentSong.title}</span>
-                <span className="text-xs text-pink-500 truncate">{isLoadingAudio ? 'Đang chuẩn bị nhạc...' : currentSong.channel}</span>
+                <span className="text-xs text-pink-500 truncate">{isLoadingAudio ? 'Đang tải nhạc...' : currentSong.channel}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               <button 
                 onClick={isPlaying ? pauseMusic : playMusic} 
-                disabled={isLoadingAudio} 
-                className={`w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${isLoadingAudio ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'} ${autoplayBlocked ? 'ring-4 ring-pink-300 animate-pulse' : ''}`}
+                disabled={isLoadingAudio && !urlCache.current[currentSong.id]} 
+                className={`w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${(isLoadingAudio && !urlCache.current[currentSong.id]) ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'} ${autoplayBlocked ? 'ring-4 ring-pink-300 animate-pulse' : ''}`}
               >
-                {isLoadingAudio ? (
+                {(isLoadingAudio && !urlCache.current[currentSong.id]) ? (
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                 ) : isPlaying ? (
                   <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
@@ -315,8 +349,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
                 <SkipForward className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
               </button>
 
-              {/* 🌟 NÚT TẮT X CỰC KỲ TINH TẾ */}
-              <div className="w-[1px] h-6 bg-gray-200 mx-1 sm:mx-2 hidden sm:block"></div>
+              <div className="w-px h-6 bg-gray-200 mx-1 sm:mx-2 hidden sm:block"></div>
               <button 
                 onClick={closePlayer} 
                 className="p-1.5 sm:p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all rounded-full ml-1"
