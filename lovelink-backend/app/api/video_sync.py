@@ -109,7 +109,7 @@ async def search_soundcloud(q: str = Query(..., description="Từ khóa tìm ki�
             for entry in result['entries']:
                 if not entry: continue
                 formatted_results.append({
-                    "videoId": entry.get("url"), # SoundCloud dùng URL trực tiếp làm ID
+                    "videoId": entry.get("webpage_url") or entry.get("url"), # SoundCloud dùng URL trực tiếp làm ID
                     "title": entry.get("title", "Không tiêu đề"),
                     "channel": entry.get("uploader", "SoundCloud Artist"),
                     "thumbnail": entry.get("thumbnails", [{}])[0].get("url")

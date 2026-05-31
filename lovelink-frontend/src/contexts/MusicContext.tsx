@@ -13,7 +13,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const [duration, setDuration] = useState(0);
   const [playlist, setPlaylist] = useState<any[]>([]);
 
-  // 🌟 Đánh lừa TypeScript
   const Player: any = ReactPlayer; 
   const playerRef = useRef<any>(null); 
   const pendingSyncRef = useRef<{time: number, isPlaying: boolean} | null>(null);
@@ -23,6 +22,13 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const isSyncingRef = useRef(false);
   const syncLockTimeoutRef = useRef<any>(null);
   const lastTimeRef = useRef(0);
+
+  // 🌟 LỚP KHIÊN AN TOÀN TRỊ BỆNH CRASH "seekTo is not a function"
+  const safeSeek = (time: number) => {
+    if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+      playerRef.current.seekTo(time, 'seconds');
+    }
+  };
 
   useEffect(() => {
     currentSongIdRef.current = currentSong.id;
@@ -50,7 +56,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           try {
             broadcastSignal('sync_music_state', { 
               song: currentSong, 
-              time: progress, // 🌟 TRỊ BỆNH CRASH: Dùng thẳng progress, không gọi getCurrentTime() nữa
+              time: progress,
               isPlaying: isPlaying, 
               playlist: currentPlaylistRef.current 
             });
@@ -63,8 +69,8 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
         if (currentSongIdRef.current !== payload.song.id) {
           pendingSyncRef.current = { time: payload.time, isPlaying: payload.isPlaying };
           setCurrentSong(payload.song);
-        } else if (playerRef.current) {
-          playerRef.current.seekTo(payload.time, 'seconds');
+        } else {
+          safeSeek(payload.time);
           setIsPlaying(payload.isPlaying);
         }
       }
@@ -81,24 +87,18 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
         setPlaylist(prev => [...prev, payload]);
       }
       else if (action === 'play_music') {
-        if (playerRef.current && payload !== undefined) {
-          lockSync();
-          playerRef.current.seekTo(payload, 'seconds');
-          setIsPlaying(true);
-        }
+        lockSync();
+        safeSeek(payload);
+        setIsPlaying(true);
       } 
       else if (action === 'pause_music') {
-        if (playerRef.current && payload !== undefined) {
-          lockSync();
-          playerRef.current.seekTo(payload, 'seconds');
-          setIsPlaying(false);
-        }
+        lockSync();
+        safeSeek(payload);
+        setIsPlaying(false);
       }
       else if (action === 'seek_music') {
-        if (playerRef.current && payload !== undefined) {
-          lockSync(1500);
-          playerRef.current.seekTo(payload, 'seconds');
-        }
+        lockSync(1500);
+        safeSeek(payload);
       }
     };
 
@@ -110,21 +110,21 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentSong, isPlaying, progress]); 
 
   const playMusic = () => {
-    if (!playerRef.current || !currentSong.id || isSyncingRef.current) return;
+    if (!currentSong.id || isSyncingRef.current) return;
     window.dispatchEvent(new Event('stop_background_music'));
     setIsPlaying(true);
-    broadcastSignal('play_music', progress); // 🌟 Dùng progress để chống văng lỗi
+    broadcastSignal('play_music', progress);
   };
 
   const pauseMusic = () => {
-    if (!playerRef.current || !currentSong.id || isSyncingRef.current) return;
+    if (!currentSong.id || isSyncingRef.current) return;
     setIsPlaying(false);
-    broadcastSignal('pause_music', progress); // 🌟 Dùng progress để chống văng lỗi
+    broadcastSignal('pause_music', progress);
   };
 
   const seekMusic = (newTime: number) => {
-    if (!playerRef.current || !currentSong.id || isSyncingRef.current) return;
-    playerRef.current.seekTo(newTime, 'seconds');
+    if (!currentSong.id || isSyncingRef.current) return;
+    safeSeek(newTime);
     setProgress(newTime);
     lastTimeRef.current = newTime;
     broadcastSignal('seek_music', newTime);
@@ -150,9 +150,10 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     broadcastSignal('change_song', song);
   };
 
-  // 🌟 TRỊ BỆNH ẢNH MỜ: Tự động "độ" ảnh HD của SoundCloud
+  // 🌟 TRỊ BỆNH ẢNH MỜ: Thuật toán Regex nhận diện mọi loại size rác (mini, tiny, small, large...) 
+  // và ép nó thành size t500x500 (Nét nhất của SoundCloud)
   const highResThumbnail = currentSong.thumbnail 
-    ? currentSong.thumbnail.replace('-large.jpg', '-t500x500.jpg') 
+    ? currentSong.thumbnail.replace(/-(mini|tiny|small|badge|large|crop)\.jpg/i, '-t500x500.jpg') 
     : '';
 
   return (
@@ -167,7 +168,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       {currentSong.id && (
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
-          {/* 🌟 TRỊ BỆNH TẮT TIẾNG: Tàng hình đúng chuẩn HTML để trình duyệt không đóng băng */}
+          {/* TRÌNH PHÁT TÀNG HÌNH */}
           <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
              <Player
                 ref={playerRef}
@@ -177,7 +178,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
                 height="10px"
                 onReady={() => {
                   if (pendingSyncRef.current) {
-                    playerRef.current?.seekTo(pendingSyncRef.current.time, 'seconds');
+                    safeSeek(pendingSyncRef.current.time);
                     setIsPlaying(pendingSyncRef.current.isPlaying);
                     pendingSyncRef.current = null;
                   } else {
@@ -211,7 +212,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               
               <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
-                {/* 🌟 Nạp ảnh HD nét căng vào đây */}
+                {/* Ảnh đã được ép lên HD 4K */}
                 <img src={highResThumbnail} alt="cover" className="w-full h-full object-cover" />
               </div>
               
