@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipForward } from 'lucide-react';
+// 🌟 Thêm Loader2 để làm icon xoay xoay lúc tải nhạc
+import { Play, Pause, SkipForward, Loader2 } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import ReactPlayer from 'react-player';
 
@@ -12,6 +13,9 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playlist, setPlaylist] = useState<any[]>([]);
+  
+  // 🌟 Thêm trạng thái để biết khi nào SoundCloud đã tải xong nhạc
+  const [isReady, setIsReady] = useState(false);
 
   const Player: any = ReactPlayer; 
   const playerRef = useRef<any>(null); 
@@ -22,6 +26,13 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const isSyncingRef = useRef(false);
   const syncLockTimeoutRef = useRef<any>(null);
   const lastTimeRef = useRef(0);
+
+  // 🌟 Reset trạng thái tải mỗi khi đổi bài mới
+  useEffect(() => {
+    setIsReady(false);
+    setDuration(0);
+    setProgress(0);
+  }, [currentSong.id]);
 
   const setSongHD = (song: any) => {
     if (!song) return;
@@ -118,27 +129,20 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentSong, isPlaying, progress]); 
 
   const playMusic = () => {
-    if (!currentSong.id || isSyncingRef.current) return;
+    if (!currentSong.id || isSyncingRef.current || !isReady) return;
     window.dispatchEvent(new Event('stop_background_music'));
     setIsPlaying(true);
     broadcastSignal('play_music', progress);
   };
 
   const pauseMusic = () => {
-    if (!currentSong.id || isSyncingRef.current) return;
+    if (!currentSong.id || isSyncingRef.current || !isReady) return;
     setIsPlaying(false);
     broadcastSignal('pause_music', progress);
   };
 
   const seekMusic = (newTime: number) => {
-    if (!currentSong.id || isSyncingRef.current) return;
-    
-    // 🌟 KHÓA BẢO VỆ: Nếu nhạc chưa tải xong (0:00), TUYỆT ĐỐI không cho bấm tua để tránh kẹt lỗi!
-    if (duration === 0) {
-      console.warn("Chưa tải xong bài hát, không thể tua!");
-      return; 
-    }
-    
+    if (!currentSong.id || isSyncingRef.current || !isReady || duration === 0) return;
     safeSeek(newTime);
     setProgress(newTime);
     lastTimeRef.current = newTime;
@@ -182,10 +186,41 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       {currentSong.id && (
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
+          {/* 🌟 TRÌNH PHÁT KÍCH THƯỚC LỚN NẰM TRONG MÀN HÌNH NHƯNG TÀNG HÌNH */}
+          <div style={{ position: 'fixed', top: '0', left: '0', width: '500px', height: '500px', opacity: 0.001, pointerEvents: 'none', zIndex: -9999 }}>
+             <Player
+                ref={playerRef}
+                url={finalPlayUrl} 
+                playing={isPlaying}
+                volume={1}           
+                width="100%"
+                height="100%"
+                onReady={() => {
+                  console.log("🔥 Âm nhạc đã tải xong, sẵn sàng phát!");
+                  setIsReady(true); // Bật cờ sẵn sàng
+                  if (pendingSyncRef.current) {
+                    safeSeek(pendingSyncRef.current.time);
+                    setIsPlaying(pendingSyncRef.current.isPlaying);
+                    pendingSyncRef.current = null;
+                  }
+                }}
+                onDuration={(d: number) => setDuration(d)}
+                onProgress={(state: any) => {
+                  if (Math.abs(state.playedSeconds - lastTimeRef.current) >= 1) {
+                    setProgress(state.playedSeconds);
+                    lastTimeRef.current = state.playedSeconds;
+                  }
+                }}
+                onEnded={handleNextSong}
+                onError={(e: any) => {
+                  // 🌟 BỎ LỆNH TẮT NHẠC Ở ĐÂY ĐỂ TRÁNH LỖI ABORT ERROR!
+                  console.warn("Cảnh báo nhẹ từ SoundCloud:", e);
+                }}
+             />
+          </div>
+
           <div className="w-full h-1 bg-gray-100 cursor-pointer" onClick={(e) => {
-              // 🌟 Khóa bảo vệ thanh tua
-              if (duration === 0) return; 
-              
+              if (duration === 0 || !isReady) return; 
               const bounds = e.currentTarget.getBoundingClientRect();
               const percent = (e.clientX - bounds.left) / bounds.width;
               seekMusic(percent * duration);
@@ -196,44 +231,8 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 max-w-7xl mx-auto w-full gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               
-              {/* 🌟 THAY ĐỔI CẤU TRÚC ẢNH ĐĨA CD: GIẤU TRÌNH PHÁT VÀO SAU BỨC ẢNH NÀY */}
-              <div className={`relative w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
-                
-                {/* Trình phát (Iframe) nằm lớp dưới cùng (z-0), hiện 100% rõ ràng */}
-                <div className="absolute inset-0 w-full h-full z-0">
-                  <Player
-                    ref={playerRef}
-                    url={finalPlayUrl} 
-                    playing={isPlaying}
-                    volume={1}           
-                    width="100%"
-                    height="100%"
-                    onReady={() => {
-                      if (pendingSyncRef.current) {
-                        safeSeek(pendingSyncRef.current.time);
-                        setIsPlaying(pendingSyncRef.current.isPlaying);
-                        pendingSyncRef.current = null;
-                      } else {
-                        setIsPlaying(true);
-                      }
-                    }}
-                    onDuration={(d: number) => setDuration(d)}
-                    onProgress={(state: any) => {
-                      if (Math.abs(state.playedSeconds - lastTimeRef.current) >= 1) {
-                        setProgress(state.playedSeconds);
-                        lastTimeRef.current = state.playedSeconds;
-                      }
-                    }}
-                    onEnded={handleNextSong}
-                    onError={(e: any) => {
-                      console.error("Lỗi phát nhạc SoundCloud:", e);
-                      setIsPlaying(false);
-                    }}
-                  />
-                </div>
-                
-                {/* Ảnh bìa nằm đè lên trên cùng (z-10) để che giấu trình phát */}
-                <img src={currentSong.thumbnail} alt="cover" className="absolute inset-0 w-full h-full object-cover z-10 bg-white" />
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
+                <img src={currentSong.thumbnail} alt="cover" className="w-full h-full object-cover" />
               </div>
               
               <div className="flex flex-col min-w-0">
@@ -245,9 +244,17 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
             <div className="flex items-center gap-4 shrink-0">
               <button 
                 onClick={isPlaying ? pauseMusic : playMusic} 
-                className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-linear-to-br from-pink-500 to-rose-500 rounded-full text-white shadow-md hover:scale-105 active:scale-95 transition-all"
+                disabled={!isReady} // Khóa nút bấm khi đang tải
+                className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${!isReady ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'}`}
               >
-                {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
+                {/* 🌟 HIỂN THỊ ICON TẢI NẾU CHƯA SẴN SÀNG */}
+                {!isReady ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="w-5 h-5 fill-current" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current ml-1" />
+                )}
               </button>
               <button 
                 onClick={handleNextSong} disabled={playlist.length === 0}
