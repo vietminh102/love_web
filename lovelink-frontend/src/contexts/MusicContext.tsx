@@ -150,8 +150,13 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     broadcastSignal('change_song', song);
   };
 
-  // 🌟 TRỊ BỆNH ẢNH MỜ: Thuật toán Regex nhận diện mọi loại size rác (mini, tiny, small, large...) 
-  // và ép nó thành size t500x500 (Nét nhất của SoundCloud)
+  // 🌟 TUYỆT CHIÊU BỌC LINK: Khai báo ngay trên chữ return để thẻ Player nhận diện được
+  let finalPlayUrl = currentSong.id;
+  if (finalPlayUrl && !finalPlayUrl.startsWith('http')) {
+    finalPlayUrl = `https://www.youtube.com/watch?v=${finalPlayUrl}`;
+  }
+
+  // 🌟 TRỊ BỆNH ẢNH MỜ: Thuật toán Regex nhận diện mọi loại size rác và ép thành size t500x500
   const highResThumbnail = currentSong.thumbnail 
     ? currentSong.thumbnail.replace(/-(mini|tiny|small|badge|large|crop)\.jpg/i, '-t500x500.jpg') 
     : '';
@@ -168,14 +173,21 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       {currentSong.id && (
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
-          {/* TRÌNH PHÁT TÀNG HÌNH */}
-          <div style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
+          {/* TRÌNH PHÁT TÀNG HÌNH ĐÁ VĂNG RA KHỎI MÀN HÌNH CHỐNG TẮT TIẾNG */}
+          <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '300px', height: '300px' }}>
              <Player
                 ref={playerRef}
-                url={currentSong.id} 
+                url={finalPlayUrl} 
                 playing={isPlaying}
-                width="10px"
-                height="10px"
+                volume={1}           
+                muted={false}        
+                width="100%"
+                height="100%"
+                config={{
+                  soundcloud: {
+                    options: { auto_play: true } 
+                  }
+                }}
                 onReady={() => {
                   if (pendingSyncRef.current) {
                     safeSeek(pendingSyncRef.current.time);
@@ -212,7 +224,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               
               <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
-                {/* Ảnh đã được ép lên HD 4K */}
                 <img src={highResThumbnail} alt="cover" className="w-full h-full object-cover" />
               </div>
               

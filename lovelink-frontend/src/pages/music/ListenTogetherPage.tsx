@@ -33,6 +33,10 @@ const ListenTogetherPage = () => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const highResThumbnail = currentSong.thumbnail 
+    ? currentSong.thumbnail.replace(/-(mini|tiny|small|badge|large|crop)\.jpg/i, '-t500x500.jpg') 
+    : currentSong.thumbnail;
+
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto p-4 space-y-8 pt-24 min-h-screen">
       {/* Tiêu đề */}
@@ -101,7 +105,7 @@ const ListenTogetherPage = () => {
         {currentSong.thumbnail && <div className="absolute inset-0 opacity-10 bg-cover bg-center blur-2xl transition-all duration-1000" style={{ backgroundImage: `url(${currentSong.thumbnail})` }}/>}
         
         <div className={`relative w-48 h-48 mb-8 rounded-full shadow-2xl border-4 border-white overflow-hidden transition-all duration-700 ${isPlaying ? 'animate-[spin_8s_linear_infinite] scale-105' : 'scale-100'}`}>
-          {currentSong.thumbnail ? <img src={currentSong.thumbnail} alt="cover" className="w-full h-full object-cover scale-150" />
+          {currentSong.thumbnail ? <img src={highResThumbnail} alt="cover" className="w-full h-full object-cover scale-150" />
           : <div className="w-full h-full bg-pink-100 flex items-center justify-center"><Disc3 className="w-20 h-20 text-pink-300" /></div>}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-inner border border-gray-100"></div>
         </div>
