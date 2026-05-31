@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import 'leaflet/dist/leaflet.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthPage from './pages/auth/AuthPage';
 import HomePage from './pages/home/HomePage'; 
@@ -9,6 +10,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import LuckyWheelPage from './pages/game/LuckyWheelPage';
 import WatchTogetherPage from './pages/watch/WatchTogetherPage';
 import ListenTogetherPage from './pages/music/ListenTogetherPage';
+import { LocationPage } from './pages/location/LocationPage';
 import { MusicProvider } from './contexts/MusicContext';
 import ReminderPage from './pages/reminder/ReminderPage'; 
 import { GlobalDrawer } from './components/GlobalDrawer';
@@ -84,6 +86,7 @@ function App() {
             <Route path="/watch" element={<WatchTogetherPage />} />
             <Route path="/music" element={<ListenTogetherPage />} />
             <Route path="/reminder" element={<ReminderPage />} />
+            <Route path="/location" element={<LocationPage />} />
           </Route>
 
           {/* Xử lý đi lạc: Gõ link bậy tự động đá về Home */}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Home, BookOpen, Image as ImageIcon, Gamepad2Icon, FilmIcon, MoreHorizontal, AlarmClock, MusicIcon} from 'lucide-react';
+import { Heart, Home, BookOpen, Image as ImageIcon, Gamepad2Icon, FilmIcon, MoreHorizontal, AlarmClock, MusicIcon, LocateIcon} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import Music from './Music';
@@ -75,6 +75,14 @@ export function Navbar() {
                     className={({ isActive }) => `flex items-center gap-3 px-4 py-3 transition-all font-semibold text-sm ${isActive ? 'bg-pink-50 text-pink-600 border-r-4 border-pink-500' : 'text-gray-600 hover:bg-pink-50 hover:text-pink-500'}`}
                   >
                     <MusicIcon className="w-4 h-4" /> <span>Nghe nhạc</span>
+                  </NavLink>
+
+                  <NavLink 
+                    to="/location" 
+                    onClick={() => setIsMoreOpen(false)} // Bấm xong tự đóng
+                    className={({ isActive }) => `flex items-center gap-3 px-4 py-3 transition-all font-semibold text-sm ${isActive ? 'bg-pink-50 text-pink-600 border-r-4 border-pink-500' : 'text-gray-600 hover:bg-pink-50 hover:text-pink-500'}`}
+                  >
+                    <LocateIcon className="w-4 h-4" /> <span>Vị trí</span>
                   </NavLink>
 
                   <NavLink 
