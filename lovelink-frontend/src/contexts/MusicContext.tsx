@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { Play, Pause, SkipForward, Loader2 } from 'lucide-react';
 import apiClient from '../services/apiClient';
-import ReactPlayer from 'react-player';
 
 const MusicContext = createContext<any>(null);
 export const useMusic = () => useContext(MusicContext);
@@ -13,10 +12,11 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const [duration, setDuration] = useState(0);
   const [playlist, setPlaylist] = useState<any[]>([]);
   
-  const [isReady, setIsReady] = useState(false);
+  // 🌟 VŨ KHÍ MỚI: Lưu trữ link MP3 trực tiếp từ Backend
+  const [audioSrc, setAudioSrc] = useState('');
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
-  const Player: any = ReactPlayer; 
-  const playerRef = useRef<any>(null); 
+  const audioRef = useRef<HTMLAudioElement>(null); 
   const pendingSyncRef = useRef<{time: number, isPlaying: boolean} | null>(null);
   
   const currentSongIdRef = useRef(currentSong.id);
@@ -24,20 +24,6 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const isSyncingRef = useRef(false);
   const syncLockTimeoutRef = useRef<any>(null);
   const lastTimeRef = useRef(0);
-
-  // 🌟 BỘ HẸN GIỜ ÉP CUNG: Nếu 2.5s không tải xong, tự động phá khóa!
-  useEffect(() => {
-    setIsReady(false);
-    setDuration(0);
-    setProgress(0);
-    
-    if (currentSong.id) {
-      const forceReady = setTimeout(() => {
-        setIsReady(true);
-      }, 2500);
-      return () => clearTimeout(forceReady);
-    }
-  }, [currentSong.id]);
 
   const setSongHD = (song: any) => {
     if (!song) return;
@@ -48,16 +34,46 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentSong(hdSong);
   };
 
-  const safeSeek = (time: number) => {
-    if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
-      playerRef.current.seekTo(time, 'seconds');
-    }
-  };
-
+  // 🌟 MỖI KHI ĐỔI BÀI: Yêu cầu Backend đi lấy link MP3
   useEffect(() => {
     currentSongIdRef.current = currentSong.id;
     currentPlaylistRef.current = playlist;
+
+    if (currentSong.id) {
+      setIsLoadingAudio(true);
+      setAudioSrc(''); // Reset audio cũ
+      
+      let targetUrl = currentSong.id;
+      if (!targetUrl.startsWith('http')) {
+        targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
+      }
+
+      apiClient.get(`/couple/video/stream-url?url=${encodeURIComponent(targetUrl)}`)
+        .then(res => {
+          if (res.data && res.data.stream_url) {
+            setAudioSrc(res.data.stream_url); // Nạp đạn (Link mp3)
+          }
+        })
+        .catch(err => console.error("Lỗi lấy audio:", err))
+        .finally(() => setIsLoadingAudio(false));
+    } else {
+      setAudioSrc('');
+    }
   }, [currentSong.id, playlist]);
+
+  // 🌟 HÀM TUA CỦA HTML5 AUDIO (Cực mượt)
+  const safeSeek = (time: number) => {
+    if (audioRef.current && isFinite(time)) {
+      audioRef.current.currentTime = time;
+    }
+  };
+
+  const safePlay = async () => {
+    if (audioRef.current) {
+      try { await audioRef.current.play(); setIsPlaying(true); } 
+      catch (error) { console.warn("Trình duyệt chặn Autoplay", error); setIsPlaying(false); }
+    }
+  };
 
   const lockSync = (lockTime = 2000) => {
     isSyncingRef.current = true;
@@ -76,13 +92,10 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       const { action, payload } = e.detail;
       
       if (action === 'request_music_sync') {
-        if (currentSongIdRef.current && playerRef.current) {
+        if (currentSongIdRef.current && audioRef.current) {
           try {
             broadcastSignal('sync_music_state', { 
-              song: currentSong, 
-              time: progress,
-              isPlaying: isPlaying, 
-              playlist: currentPlaylistRef.current 
+              song: currentSong, time: progress, isPlaying: isPlaying, playlist: currentPlaylistRef.current 
             });
           } catch (err) {}
         }
@@ -95,59 +108,62 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           setSongHD(payload.song); 
         } else {
           safeSeek(payload.time);
-          setIsPlaying(payload.isPlaying);
+          if (payload.isPlaying) safePlay(); else { audioRef.current?.pause(); setIsPlaying(false); }
         }
       }
       else if (action === 'change_song') {
-        setSongHD(payload); 
-        lockSync(5000);
+        setSongHD(payload); lockSync(5000);
       } 
       else if (action === 'play_next_song') {
-        setSongHD(payload.nextSong); 
-        setPlaylist(payload.remainingPlaylist);
-        lockSync(5000);
+        setSongHD(payload.nextSong); setPlaylist(payload.remainingPlaylist); lockSync(5000);
       }
       else if (action === 'add_to_playlist') {
         setPlaylist(prev => [...prev, payload]);
       }
       else if (action === 'play_music') {
-        lockSync();
-        safeSeek(payload);
-        setIsPlaying(true);
+        lockSync(); safeSeek(payload); safePlay();
       } 
       else if (action === 'pause_music') {
-        lockSync();
-        safeSeek(payload);
-        setIsPlaying(false);
+        lockSync(); safeSeek(payload); audioRef.current?.pause(); setIsPlaying(false);
       }
       else if (action === 'seek_music') {
-        lockSync(1500);
-        safeSeek(payload);
+        lockSync(1500); safeSeek(payload);
       }
     };
 
     window.addEventListener('sync_video_event', handleRemoteSignaling);
-    return () => {
-      clearTimeout(syncTimeout);
-      window.removeEventListener('sync_video_event', handleRemoteSignaling);
-    };
+    return () => { clearTimeout(syncTimeout); window.removeEventListener('sync_video_event', handleRemoteSignaling); };
   }, [currentSong, isPlaying, progress]); 
 
+  // --- KHI AUDIO SẴN SÀNG (ĐÃ CÓ LINK) ---
+  useEffect(() => {
+    if (audioSrc && audioRef.current) {
+      if (pendingSyncRef.current) {
+        safeSeek(pendingSyncRef.current.time);
+        if (pendingSyncRef.current.isPlaying) safePlay();
+        pendingSyncRef.current = null;
+      } else {
+        safePlay(); // Tự động phát khi tải xong link mp3
+      }
+    }
+  }, [audioSrc]);
+
   const playMusic = () => {
-    if (!currentSong.id || isSyncingRef.current || !isReady) return;
+    if (!audioSrc || isSyncingRef.current) return;
     window.dispatchEvent(new Event('stop_background_music'));
-    setIsPlaying(true);
+    safePlay();
     broadcastSignal('play_music', progress);
   };
 
   const pauseMusic = () => {
-    if (!currentSong.id || isSyncingRef.current || !isReady) return;
+    if (!audioSrc || isSyncingRef.current) return;
+    audioRef.current?.pause();
     setIsPlaying(false);
     broadcastSignal('pause_music', progress);
   };
 
   const seekMusic = (newTime: number) => {
-    if (!currentSong.id || isSyncingRef.current || !isReady || duration === 0) return;
+    if (!audioSrc || isSyncingRef.current || duration === 0) return;
     safeSeek(newTime);
     setProgress(newTime);
     lastTimeRef.current = newTime;
@@ -164,57 +180,29 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const addSongToPlaylist = (song: any) => {
-    setPlaylist(prev => [...prev, song]);
-    broadcastSignal('add_to_playlist', song);
-  };
-
-  const changeSongNow = (song: any) => {
-    setSongHD(song); 
-    broadcastSignal('change_song', song);
-  };
-
-  let finalPlayUrl = currentSong.id;
-  if (finalPlayUrl && !finalPlayUrl.startsWith('http')) {
-    finalPlayUrl = `https://www.youtube.com/watch?v=${finalPlayUrl}`;
-  }
-
   return (
     <MusicContext.Provider value={{ 
       currentSong, isPlaying, progress, duration, playlist,
-      playMusic, pauseMusic, seekMusic, handleNextSong, addSongToPlaylist, changeSongNow
+      playMusic, pauseMusic, seekMusic, handleNextSong, 
+      addSongToPlaylist: (song: any) => { setPlaylist(prev => [...prev, song]); broadcastSignal('add_to_playlist', song); }, 
+      changeSongNow: (song: any) => { setSongHD(song); broadcastSignal('change_song', song); }
     }}>
       
-      {/* 🌟 VŨ KHÍ TỐI THƯỢNG: Trình phát khổng lồ lót dưới cùng trang web */}
-      {/* Không bao giờ bị kẹt vì đủ kích thước và không bị ép autoplay */}
-      {currentSong.id && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -9999, pointerEvents: 'none' }}>
-           <Player
-              ref={playerRef}
-              url={finalPlayUrl} 
-              playing={isPlaying}
-              volume={1}           
-              width="100%"
-              height="100%"
-              onReady={() => {
-                setIsReady(true);
-                if (pendingSyncRef.current) {
-                  safeSeek(pendingSyncRef.current.time);
-                  setIsPlaying(pendingSyncRef.current.isPlaying);
-                  pendingSyncRef.current = null;
-                }
-              }}
-              onDuration={(d: number) => setDuration(d)}
-              onProgress={(state: any) => {
-                if (Math.abs(state.playedSeconds - lastTimeRef.current) >= 1) {
-                  setProgress(state.playedSeconds);
-                  lastTimeRef.current = state.playedSeconds;
-                }
-              }}
-              onEnded={handleNextSong}
-              onError={(e: any) => console.warn("Bỏ qua lỗi nhẹ:", e)}
-           />
-        </div>
+      {/* 🌟 THẺ AUDIO HUYỀN THOẠI: Không iframe, không quảng cáo, nhẹ tựa lông hồng */}
+      {audioSrc && (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+          onTimeUpdate={(e) => {
+            const time = e.currentTarget.currentTime;
+            if (Math.abs(time - lastTimeRef.current) >= 1) {
+              setProgress(time);
+              lastTimeRef.current = time;
+            }
+          }}
+          onEnded={handleNextSong}
+        />
       )}
 
       <div className={currentSong.id ? "pb-24" : ""}> 
@@ -225,7 +213,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
           <div className="w-full h-1 bg-gray-100 cursor-pointer" onClick={(e) => {
-              if (duration === 0 || !isReady) return; 
+              if (duration === 0 || isLoadingAudio) return; 
               const bounds = e.currentTarget.getBoundingClientRect();
               const percent = (e.clientX - bounds.left) / bounds.width;
               seekMusic(percent * duration);
@@ -242,17 +230,17 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
               
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-sm sm:text-base text-gray-800 truncate">{currentSong.title}</span>
-                <span className="text-xs text-pink-500 truncate">{currentSong.channel}</span>
+                <span className="text-xs text-pink-500 truncate">{isLoadingAudio ? 'Đang chuẩn bị nhạc...' : currentSong.channel}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-4 shrink-0">
               <button 
                 onClick={isPlaying ? pauseMusic : playMusic} 
-                disabled={!isReady} 
-                className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${!isReady ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'}`}
+                disabled={isLoadingAudio} 
+                className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-md transition-all ${isLoadingAudio ? 'bg-gray-300' : 'bg-linear-to-br from-pink-500 to-rose-500 hover:scale-105 active:scale-95'}`}
               >
-                {!isReady ? (
+                {isLoadingAudio ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : isPlaying ? (
                   <Pause className="w-5 h-5 fill-current" />
