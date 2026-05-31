@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.nosql import connect_to_mongo, close_mongo_connection
-from app.api import auth, diary, gallery, notifications, lucky_wheel,video_sync,reminder
+from app.api import auth, diary, gallery, notifications, lucky_wheel,video_sync,reminder,music
 from app.api import couple
 import asyncio
 from sqlalchemy import select
@@ -47,9 +47,6 @@ async def lifespan(app: FastAPI):
     print("✅ Đã kết nối MongoDB và khởi tạo Beanie thành công!")
     print("🚀 Server đang chạy...")
 
-    asyncio.create_task(background_alarm_worker())
-    print("🚀 Bác bảo vệ canh báo thức Email đã thức dậy!")
-    
     asyncio.create_task(run_milestone_scheduler())
     yield
     # Chạy khi server tắt
@@ -62,71 +59,56 @@ async def background_alarm_worker():
         try:
             now_utc = datetime.now(timezone.utc)
             
-            # 📷 CAMERA 1: Báo cáo mỗi lần đi tuần
-            print(f"🕵️‍♂️ [Bác bảo vệ] Đang quét DB lúc: {now_utc}...")
-            
+            # Tìm các báo thức quá hạn chưa kích hoạt
             overdue_reminders = await Reminder.find(
                 {"is_triggered": False, "remind_time": {"$lte": now_utc}}
             ).to_list()
 
-            # 📷 CAMERA 2: Báo cáo xem có tìm thấy báo thức nào không
-            print(f"📦 [Bác bảo vệ] Tìm thấy {len(overdue_reminders)} báo thức quá hạn!")
-
             if overdue_reminders:
                 async for db in get_db():
                     for r in overdue_reminders:
+                        # Đánh dấu đã kích hoạt lập tức để tránh trùng lặp
                         r.is_triggered = True
                         await r.save()
-                        
-                        # 📷 CAMERA 3: Báo cáo xử lý gửi mail
-                        print(f"✉️ [Bác bảo vệ] Bắt đầu xử lý gửi mail cho báo thức: {r.title}")
                         
                         if getattr(r, "send_email", False):
                             stmt_couple = select(Couples).where(Couples.id == str(r.couple_id))
                             couple_obj = (await db.execute(stmt_couple)).scalars().first()
                             
                             if couple_obj:
-                                # 1. Xác định ID của nửa kia (Người nhận)
+                                # 1. Xác định ID người nhận (đối phương)
                                 partner_id = couple_obj.user1_id if str(couple_obj.user1_id) != str(r.created_by) else couple_obj.user2_id
                                 
-                                # 2. Lấy Email của đối phương từ Database SQL
+                                # 2. Truy vấn lấy thông tin đối phương
                                 stmt_partner = select(Users).where(Users.id == partner_id)
                                 partner_obj = (await db.execute(stmt_partner)).scalars().first()
                                 
-                                # 3. 🌟 LẤY THÊM: Email của người tạo báo thức (Chính bạn) từ Database SQL
+                                # 3. Truy vấn lấy thông tin người tạo (chính bạn)
                                 stmt_creator = select(Users).where(Users.id == r.created_by)
                                 creator_obj = (await db.execute(stmt_creator)).scalars().first()
                                 
-                                # Gom danh sách các hàm xử lý gửi mail chạy ngầm
                                 email_tasks = []
                                 
-                                # Kiểm tra bọc thép Email đối phương
+                                # Kiểm tra và thêm tác vụ gửi mail cho đối phương
                                 if partner_obj and partner_obj.email and "@" in partner_obj.email:
                                     email_tasks.append(send_reminder_email(partner_obj.email, r.title, r.message))
-                                    print(f"✅ Bác bảo vệ chuẩn bị bắn Email tới đối phương: {partner_obj.email}")
-                                else:
-                                    print(f"⚠️ Đối phương (ID: {partner_id}) không có Email hợp lệ để nhận!")
                                     
-                                # Kiểm tra bọc thép Email người tạo (Chính bạn)
+                                # Kiểm tra và thêm tác vụ gửi mail cho chính bạn
                                 if creator_obj and creator_obj.email and "@" in creator_obj.email:
                                     email_tasks.append(send_reminder_email(creator_obj.email, r.title, r.message))
-                                    print(f"✅ Bác bảo vệ chuẩn bị bắn Email tới người tạo: {creator_obj.email}")
-                                else:
-                                    print(f"⚠️ Người tạo báo thức (ID: {r.created_by}) không có Email hợp lệ để nhận!")
                                 
-                                # 🌟 KÍCH HOẠT: Bắn đồng thời cả hai Email chạy ngầm cùng lúc cho nhanh
+                                # Đồng thời kích hoạt gửi email cho cả hai tài khoản hợp lệ
                                 if email_tasks:
                                     await asyncio.gather(*email_tasks)
                     break 
         except Exception as e:
-            # 📷 CAMERA 5: Bắt trọn khoảnh khắc nếu code bị sụp đổ
             print(f"❌ Lỗi Bác bảo vệ chạy ngầm: {e}")
             
-        await asyncio.sleep(20)
+        # Hệ thống đi tuần định kỳ mỗi 1 phút (60 giây)
+        await asyncio.sleep(60)
 # KÍCH HOẠT BÁC BẢO VỆ KHI SERVER VỪA BẬT LÊN
 @app.on_event("startup")
 async def startup_event():
-    # Kích hoạt vòng lặp chạy ngầm ở Background
     asyncio.create_task(background_alarm_worker())
     print("🚀 Bác bảo vệ canh báo thức Email đã thức dậy!")
 
@@ -147,6 +129,7 @@ app.include_router(gallery.router)
 app.include_router(notifications.router)
 app.include_router(lucky_wheel.router)
 app.include_router(video_sync.router)
+app.include_router(music.router)
 app.include_router(reminder.router)
 
 @app.get("/")

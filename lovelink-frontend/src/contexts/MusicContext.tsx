@@ -12,18 +12,24 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const [duration, setDuration] = useState(0);
   const [playlist, setPlaylist] = useState<any[]>([]);
   
-  // 🌟 VŨ KHÍ MỚI: Lưu trữ link MP3 trực tiếp từ Backend
   const [audioSrc, setAudioSrc] = useState('');
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null); 
   const pendingSyncRef = useRef<{time: number, isPlaying: boolean} | null>(null);
   
-  const currentSongIdRef = useRef(currentSong.id);
-  const currentPlaylistRef = useRef(playlist);
+  // 🌟 KHU VỰC REFS: Tránh lỗi re-render vòng lặp vô tận
+  const currentSongRef = useRef(currentSong);
+  const isPlayingRef = useRef(isPlaying);
+  const progressRef = useRef(progress);
+  const playlistRef = useRef(playlist);
   const isSyncingRef = useRef(false);
-  const syncLockTimeoutRef = useRef<any>(null);
-  const lastTimeRef = useRef(0);
+
+  // Cập nhật Refs liên tục để EventListener luôn đọc được data mới nhất mà không bị lỗi
+  useEffect(() => { currentSongRef.current = currentSong; }, [currentSong]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { progressRef.current = progress; }, [progress]);
+  useEffect(() => { playlistRef.current = playlist; }, [playlist]);
 
   const setSongHD = (song: any) => {
     if (!song) return;
@@ -34,24 +40,18 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentSong(hdSong);
   };
 
-  // 🌟 MỖI KHI ĐỔI BÀI: Yêu cầu Backend đi lấy link MP3
+  // 🌟 ĐI LẤY LINK MP3 TỪ BACKEND KHI ĐỔI BÀI
   useEffect(() => {
-    currentSongIdRef.current = currentSong.id;
-    currentPlaylistRef.current = playlist;
-
     if (currentSong.id) {
       setIsLoadingAudio(true);
-      setAudioSrc(''); // Reset audio cũ
-      
+      setAudioSrc(''); 
       let targetUrl = currentSong.id;
-      if (!targetUrl.startsWith('http')) {
-        targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
-      }
+      if (!targetUrl.startsWith('http')) targetUrl = `https://www.youtube.com/watch?v=${targetUrl}`;
 
-      apiClient.get(`/couple/video/stream-url?url=${encodeURIComponent(targetUrl)}`)
+      apiClient.get(`/couple/music/stream-url?url=${encodeURIComponent(targetUrl)}`)
         .then(res => {
           if (res.data && res.data.stream_url) {
-            setAudioSrc(res.data.stream_url); // Nạp đạn (Link mp3)
+            setAudioSrc(res.data.stream_url); 
           }
         })
         .catch(err => console.error("Lỗi lấy audio:", err))
@@ -59,83 +59,97 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     } else {
       setAudioSrc('');
     }
-  }, [currentSong.id, playlist]);
+  }, [currentSong.id]);
 
-  // 🌟 HÀM TUA CỦA HTML5 AUDIO (Cực mượt)
   const safeSeek = (time: number) => {
     if (audioRef.current && isFinite(time)) {
       audioRef.current.currentTime = time;
+      setProgress(time);
     }
   };
 
   const safePlay = async () => {
     if (audioRef.current) {
-      try { await audioRef.current.play(); setIsPlaying(true); } 
-      catch (error) { console.warn("Trình duyệt chặn Autoplay", error); setIsPlaying(false); }
+      try { 
+        await audioRef.current.play(); 
+        setIsPlaying(true); 
+      } catch (error) { 
+        // 🌟 BẮT LỖI TRÌNH DUYỆT CẤM AUTOPLAY (Dành cho người vào sau)
+        console.warn("Trình duyệt yêu cầu bạn click vào màn hình để phát nhạc!"); 
+        setIsPlaying(false); 
+      }
     }
   };
 
-  const lockSync = (lockTime = 2000) => {
-    isSyncingRef.current = true;
-    if (syncLockTimeoutRef.current) clearTimeout(syncLockTimeoutRef.current);
-    syncLockTimeoutRef.current = setTimeout(() => { isSyncingRef.current = false; }, lockTime); 
-  };
-
   const broadcastSignal = (action: string, payload: any = null) => {
+    // Nếu đang bị người khác điều khiển (isSyncingRef = true) thì TUYỆT ĐỐI KHÔNG gửi ngược lại
+    if (isSyncingRef.current) return;
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
+  // 🌟 TỔNG ĐÀI ĐỒNG BỘ: CHỈ CHẠY 1 LẦN DUY NHẤT LÚC MỞ WEB
   useEffect(() => {
-    const syncTimeout = setTimeout(() => { broadcastSignal('request_music_sync'); }, 1500);
+    // Người mới vào phòng: Lập tức hô to hỏi xem có ai đang nghe nhạc không
+    setTimeout(() => {
+        apiClient.post('/couple/video/sync', { action: 'request_music_sync', payload: null }).catch(console.error);
+    }, 1500);
 
     const handleRemoteSignaling = async (e: any) => {
       const { action, payload } = e.detail;
       
+      // 1. NGƯỜI CŨ NHẬN ĐƯỢC LỜI HỎI THĂM TỪ NGƯỜI MỚI
       if (action === 'request_music_sync') {
-        if (currentSongIdRef.current && audioRef.current) {
-          try {
-            broadcastSignal('sync_music_state', { 
-              song: currentSong, time: progress, isPlaying: isPlaying, playlist: currentPlaylistRef.current 
-            });
-          } catch (err) {}
+        if (currentSongRef.current.id && isPlayingRef.current) {
+          apiClient.post('/couple/video/sync', { 
+            action: 'sync_music_state', 
+            payload: { song: currentSongRef.current, time: progressRef.current, isPlaying: isPlayingRef.current, playlist: playlistRef.current } 
+          }).catch(console.error);
         }
       }
+      
+      // 2. NGƯỜI MỚI NHẬN ĐƯỢC CÂU TRẢ LỜI ĐỂ CẬP NHẬT GIAO DIỆN
       else if (action === 'sync_music_state') {
-        lockSync(5000); 
+        isSyncingRef.current = true; // Bật khóa cấm phản dame
         setPlaylist(payload.playlist || []);
-        if (currentSongIdRef.current !== payload.song.id) {
+        
+        if (currentSongRef.current.id !== payload.song.id) {
           pendingSyncRef.current = { time: payload.time, isPlaying: payload.isPlaying };
           setSongHD(payload.song); 
         } else {
           safeSeek(payload.time);
           if (payload.isPlaying) safePlay(); else { audioRef.current?.pause(); setIsPlaying(false); }
         }
+        setTimeout(() => { isSyncingRef.current = false; }, 1000); // Tắt khóa
       }
+      
+      // 3. ĐỒNG BỘ ĐỔI BÀI HÁT
       else if (action === 'change_song') {
-        setSongHD(payload); lockSync(5000);
+        isSyncingRef.current = true; setSongHD(payload); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       } 
       else if (action === 'play_next_song') {
-        setSongHD(payload.nextSong); setPlaylist(payload.remainingPlaylist); lockSync(5000);
+        isSyncingRef.current = true; setSongHD(payload.nextSong); setPlaylist(payload.remainingPlaylist); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       }
       else if (action === 'add_to_playlist') {
         setPlaylist(prev => [...prev, payload]);
       }
+      
+      // 4. ĐỒNG BỘ PLAY / PAUSE / TUA NHẠC
       else if (action === 'play_music') {
-        lockSync(); safeSeek(payload); safePlay();
+        isSyncingRef.current = true; safeSeek(payload); safePlay(); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       } 
       else if (action === 'pause_music') {
-        lockSync(); safeSeek(payload); audioRef.current?.pause(); setIsPlaying(false);
+        isSyncingRef.current = true; safeSeek(payload); audioRef.current?.pause(); setIsPlaying(false); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       }
       else if (action === 'seek_music') {
-        lockSync(1500); safeSeek(payload);
+        isSyncingRef.current = true; safeSeek(payload); setTimeout(() => { isSyncingRef.current = false; }, 1000);
       }
     };
 
     window.addEventListener('sync_video_event', handleRemoteSignaling);
-    return () => { clearTimeout(syncTimeout); window.removeEventListener('sync_video_event', handleRemoteSignaling); };
-  }, [currentSong, isPlaying, progress]); 
+    return () => window.removeEventListener('sync_video_event', handleRemoteSignaling);
+  }, []); 
 
-  // --- KHI AUDIO SẴN SÀNG (ĐÃ CÓ LINK) ---
+  // KHI ĐÃ CÓ LINK MP3
   useEffect(() => {
     if (audioSrc && audioRef.current) {
       if (pendingSyncRef.current) {
@@ -143,37 +157,36 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
         if (pendingSyncRef.current.isPlaying) safePlay();
         pendingSyncRef.current = null;
       } else {
-        safePlay(); // Tự động phát khi tải xong link mp3
+        safePlay(); 
       }
     }
   }, [audioSrc]);
 
+  // HÀM NGƯỜI DÙNG BẤM
   const playMusic = () => {
-    if (!audioSrc || isSyncingRef.current) return;
+    if (!audioSrc) return;
     window.dispatchEvent(new Event('stop_background_music'));
     safePlay();
-    broadcastSignal('play_music', progress);
+    broadcastSignal('play_music', audioRef.current?.currentTime || 0);
   };
 
   const pauseMusic = () => {
-    if (!audioSrc || isSyncingRef.current) return;
+    if (!audioSrc) return;
     audioRef.current?.pause();
     setIsPlaying(false);
-    broadcastSignal('pause_music', progress);
+    broadcastSignal('pause_music', audioRef.current?.currentTime || 0);
   };
 
   const seekMusic = (newTime: number) => {
-    if (!audioSrc || isSyncingRef.current || duration === 0) return;
+    if (!audioSrc || duration === 0) return;
     safeSeek(newTime);
-    setProgress(newTime);
-    lastTimeRef.current = newTime;
     broadcastSignal('seek_music', newTime);
   };
 
   const handleNextSong = () => {
-    if (currentPlaylistRef.current.length > 0) {
-      const nextSong = currentPlaylistRef.current[0];
-      const remainingPlaylist = currentPlaylistRef.current.slice(1);
+    if (playlist.length > 0) {
+      const nextSong = playlist[0];
+      const remainingPlaylist = playlist.slice(1);
       setSongHD(nextSong); 
       setPlaylist(remainingPlaylist);
       broadcastSignal('play_next_song', { nextSong, remainingPlaylist });
@@ -188,18 +201,14 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       changeSongNow: (song: any) => { setSongHD(song); broadcastSignal('change_song', song); }
     }}>
       
-      {/* 🌟 THẺ AUDIO HUYỀN THOẠI: Không iframe, không quảng cáo, nhẹ tựa lông hồng */}
       {audioSrc && (
         <audio
           ref={audioRef}
           src={audioSrc}
           onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
           onTimeUpdate={(e) => {
-            const time = e.currentTarget.currentTime;
-            if (Math.abs(time - lastTimeRef.current) >= 1) {
-              setProgress(time);
-              lastTimeRef.current = time;
-            }
+            // Không bao giờ được phép gửi broadcast tự động trong hàm này!
+            setProgress(e.currentTarget.currentTime);
           }}
           onEnded={handleNextSong}
         />

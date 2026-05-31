@@ -2,9 +2,8 @@ from fastapi import APIRouter, Depends,Query,HTTPException,Request
 from fastapi.responses import RedirectResponse,StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-import requests
 import os
-import urllib.parse
+
 import asyncio
 
 from app.db.sql import get_db
@@ -96,50 +95,3 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
         print(f"❌ Lỗi khi cào YouTube với yt-dlp: {e}")
         return {"items": []}
 
-@router.get("/search/soundcloud")
-async def search_soundcloud(q: str = Query(..., description="Từ khóa tìm kiếm SoundCloud")):
-    def fetch_soundcloud_data():
-        ydl_opts = {'format': 'best', 'extract_flat': True, 'quiet': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            return ydl.extract_info(f"scsearch5:{q}", download=False)
-
-    try:
-        result = await asyncio.to_thread(fetch_soundcloud_data)
-        formatted_results = []
-        if 'entries' in result:
-            for entry in result['entries']:
-                if not entry: continue
-                formatted_results.append({
-                    "videoId": entry.get("webpage_url") or entry.get("url"), # SoundCloud dùng URL trực tiếp làm ID
-                    "title": entry.get("title", "Không tiêu đề"),
-                    "channel": entry.get("uploader", "SoundCloud Artist"),
-                    "thumbnail": entry.get("thumbnails", [{}])[0].get("url")
-                })
-        return {"items": formatted_results}
-    except Exception as e:
-        print(f"❌ Lỗi tìm kiếm SoundCloud: {e}")
-        return {"items": []}
-@router.get("/stream-url")
-async def get_stream_url(url: str = Query(..., description="Link bài hát SoundCloud")):
-    def fetch_direct_audio():
-        ydl_opts = {
-            'format': 'bestaudio/best', # Chỉ lấy audio chất lượng tốt nhất
-            'quiet': True,
-            'no_warnings': True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Giải mã URL nếu bị mã hóa
-            decoded_url = urllib.parse.unquote(url)
-            # Lấy thông tin (download=False nghĩa là chỉ lấy link chứ không tải về máy)
-            info = ydl.extract_info(decoded_url, download=False)
-            return info.get('url') # Đây chính là link file mp3/m4a thần thánh!
-
-    try:
-        direct_url = await asyncio.to_thread(fetch_direct_audio)
-        if direct_url:
-            return {"stream_url": direct_url}
-        else:
-            return {"error": "Không lấy được link nhạc"}
-    except Exception as e:
-        print(f"❌ Lỗi lấy stream URL: {e}")
-        return {"error": str(e)}
