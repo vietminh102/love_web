@@ -23,7 +23,15 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   const syncLockTimeoutRef = useRef<any>(null);
   const lastTimeRef = useRef(0);
 
-  // 🌟 LỚP KHIÊN AN TOÀN TRỊ BỆNH CRASH "seekTo is not a function"
+  const setSongHD = (song: any) => {
+    if (!song) return;
+    const hdSong = {
+      ...song,
+      thumbnail: song.thumbnail ? song.thumbnail.replace(/-(mini|tiny|small|badge|large|crop)\.jpg/i, '-t500x500.jpg') : ''
+    };
+    setCurrentSong(hdSong);
+  };
+
   const safeSeek = (time: number) => {
     if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
       playerRef.current.seekTo(time, 'seconds');
@@ -68,18 +76,18 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
         setPlaylist(payload.playlist || []);
         if (currentSongIdRef.current !== payload.song.id) {
           pendingSyncRef.current = { time: payload.time, isPlaying: payload.isPlaying };
-          setCurrentSong(payload.song);
+          setSongHD(payload.song); 
         } else {
           safeSeek(payload.time);
           setIsPlaying(payload.isPlaying);
         }
       }
       else if (action === 'change_song') {
-        setCurrentSong(payload);
+        setSongHD(payload); 
         lockSync(5000);
       } 
       else if (action === 'play_next_song') {
-        setCurrentSong(payload.nextSong);
+        setSongHD(payload.nextSong); 
         setPlaylist(payload.remainingPlaylist);
         lockSync(5000);
       }
@@ -124,6 +132,13 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
 
   const seekMusic = (newTime: number) => {
     if (!currentSong.id || isSyncingRef.current) return;
+    
+    // 🌟 KHÓA BẢO VỆ: Nếu nhạc chưa tải xong (0:00), TUYỆT ĐỐI không cho bấm tua để tránh kẹt lỗi!
+    if (duration === 0) {
+      console.warn("Chưa tải xong bài hát, không thể tua!");
+      return; 
+    }
+    
     safeSeek(newTime);
     setProgress(newTime);
     lastTimeRef.current = newTime;
@@ -134,7 +149,7 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
     if (currentPlaylistRef.current.length > 0) {
       const nextSong = currentPlaylistRef.current[0];
       const remainingPlaylist = currentPlaylistRef.current.slice(1);
-      setCurrentSong(nextSong);
+      setSongHD(nextSong); 
       setPlaylist(remainingPlaylist);
       broadcastSignal('play_next_song', { nextSong, remainingPlaylist });
     }
@@ -146,20 +161,14 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const changeSongNow = (song: any) => {
-    setCurrentSong(song);
+    setSongHD(song); 
     broadcastSignal('change_song', song);
   };
 
-  // 🌟 TUYỆT CHIÊU BỌC LINK: Khai báo ngay trên chữ return để thẻ Player nhận diện được
   let finalPlayUrl = currentSong.id;
   if (finalPlayUrl && !finalPlayUrl.startsWith('http')) {
     finalPlayUrl = `https://www.youtube.com/watch?v=${finalPlayUrl}`;
   }
-
-  // 🌟 TRỊ BỆNH ẢNH MỜ: Thuật toán Regex nhận diện mọi loại size rác và ép thành size t500x500
-  const highResThumbnail = currentSong.thumbnail 
-    ? currentSong.thumbnail.replace(/-(mini|tiny|small|badge|large|crop)\.jpg/i, '-t500x500.jpg') 
-    : '';
 
   return (
     <MusicContext.Provider value={{ 
@@ -173,46 +182,10 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
       {currentSong.id && (
         <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-xl border-t border-pink-100 shadow-[0_-10px_30px_rgba(255,192,203,0.3)] z-50 flex flex-col animate-in slide-in-from-bottom-10">
           
-          {/* TRÌNH PHÁT TÀNG HÌNH ĐÁ VĂNG RA KHỎI MÀN HÌNH CHỐNG TẮT TIẾNG */}
-          <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '300px', height: '300px' }}>
-             <Player
-                ref={playerRef}
-                url={finalPlayUrl} 
-                playing={isPlaying}
-                volume={1}           
-                muted={false}        
-                width="100%"
-                height="100%"
-                config={{
-                  soundcloud: {
-                    options: { auto_play: true } 
-                  }
-                }}
-                onReady={() => {
-                  if (pendingSyncRef.current) {
-                    safeSeek(pendingSyncRef.current.time);
-                    setIsPlaying(pendingSyncRef.current.isPlaying);
-                    pendingSyncRef.current = null;
-                  } else {
-                    setIsPlaying(true);
-                  }
-                }}
-                onDuration={(d: number) => setDuration(d)}
-                onProgress={(state: any) => {
-                  if (Math.abs(state.playedSeconds - lastTimeRef.current) >= 1) {
-                    setProgress(state.playedSeconds);
-                    lastTimeRef.current = state.playedSeconds;
-                  }
-                }}
-                onEnded={handleNextSong}
-                onError={(e: any) => {
-                  console.error("Lỗi phát nhạc SoundCloud:", e);
-                  setIsPlaying(false);
-                }}
-             />
-          </div>
-
           <div className="w-full h-1 bg-gray-100 cursor-pointer" onClick={(e) => {
+              // 🌟 Khóa bảo vệ thanh tua
+              if (duration === 0) return; 
+              
               const bounds = e.currentTarget.getBoundingClientRect();
               const percent = (e.clientX - bounds.left) / bounds.width;
               seekMusic(percent * duration);
@@ -223,8 +196,44 @@ export const MusicProvider = ({ children }: { children: React.ReactNode }) => {
           <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 max-w-7xl mx-auto w-full gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
-                <img src={highResThumbnail} alt="cover" className="w-full h-full object-cover" />
+              {/* 🌟 THAY ĐỔI CẤU TRÚC ẢNH ĐĨA CD: GIẤU TRÌNH PHÁT VÀO SAU BỨC ẢNH NÀY */}
+              <div className={`relative w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shrink-0 border-2 border-pink-100 shadow-sm ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
+                
+                {/* Trình phát (Iframe) nằm lớp dưới cùng (z-0), hiện 100% rõ ràng */}
+                <div className="absolute inset-0 w-full h-full z-0">
+                  <Player
+                    ref={playerRef}
+                    url={finalPlayUrl} 
+                    playing={isPlaying}
+                    volume={1}           
+                    width="100%"
+                    height="100%"
+                    onReady={() => {
+                      if (pendingSyncRef.current) {
+                        safeSeek(pendingSyncRef.current.time);
+                        setIsPlaying(pendingSyncRef.current.isPlaying);
+                        pendingSyncRef.current = null;
+                      } else {
+                        setIsPlaying(true);
+                      }
+                    }}
+                    onDuration={(d: number) => setDuration(d)}
+                    onProgress={(state: any) => {
+                      if (Math.abs(state.playedSeconds - lastTimeRef.current) >= 1) {
+                        setProgress(state.playedSeconds);
+                        lastTimeRef.current = state.playedSeconds;
+                      }
+                    }}
+                    onEnded={handleNextSong}
+                    onError={(e: any) => {
+                      console.error("Lỗi phát nhạc SoundCloud:", e);
+                      setIsPlaying(false);
+                    }}
+                  />
+                </div>
+                
+                {/* Ảnh bìa nằm đè lên trên cùng (z-10) để che giấu trình phát */}
+                <img src={currentSong.thumbnail} alt="cover" className="absolute inset-0 w-full h-full object-cover z-10 bg-white" />
               </div>
               
               <div className="flex flex-col min-w-0">
