@@ -208,10 +208,15 @@ export const LiveLocation = () => {
         setPartnerStationarySince(null);
         setPartnerBattery(null);
         setPartnerAddress('Ngoại tuyến');
-        // Xóa luôn trong bộ nhớ tạm để F5 không bị hiện lại vị trí cũ của họ
+        
+        // Xóa luôn trong bộ nhớ tạm để F5 không bị hiện lại vị trí cũ
         localStorage.removeItem('partnerLastCoords');
         localStorage.removeItem('partnerStationarySince');
         localStorage.removeItem('partnerAddress');
+        
+        // Phải reset lại bộ nhớ đệm tọa độ cũ của đối phương. 
+        // Nếu không, khi đối phương bật lại ở cùng 1 chỗ, hệ thống sẽ tưởng chưa di chuyển và không thèm dịch tên đường!
+        lastFetchedPartnerCoords.current = null;
       }
     };
 
