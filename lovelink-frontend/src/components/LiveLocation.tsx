@@ -32,19 +32,36 @@ const RecenterMap = ({ coords }: { coords: [number, number] | null }) => {
 };
 
 export const LiveLocation = () => {
-  const [myCoords, setMyCoords] = useState<[number, number] | null>(null);
-  const [partnerCoords, setPartnerCoords] = useState<[number, number] | null>(null);
+  // 🌟 NÂNG CẤP: Khởi tạo tất cả trạng thái từ localStorage để chống mất dữ liệu khi F5
+  const [myCoords, setMyCoords] = useState<[number, number] | null>(() => {
+    const saved = localStorage.getItem('myLastCoords');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [partnerCoords, setPartnerCoords] = useState<[number, number] | null>(() => {
+    const saved = localStorage.getItem('partnerLastCoords');
+    return saved ? JSON.parse(saved) : null;
+  });
   
   const [myBattery, setMyBattery] = useState<{ level: number; isCharging: boolean } | null>(null);
   const [partnerBattery, setPartnerBattery] = useState<{ level: number; isCharging: boolean } | null>(null);
   
-  const [myAddress, setMyAddress] = useState<string>('Chưa bật định vị');
-  const [partnerAddress, setPartnerAddress] = useState<string>('Ngoại tuyến');
+  const [myAddress, setMyAddress] = useState<string>(() => {
+    return localStorage.getItem('myAddress') || 'Chưa bật định vị';
+  });
+  const [partnerAddress, setPartnerAddress] = useState<string>(() => {
+    return localStorage.getItem('partnerAddress') || 'Ngoại tuyến';
+  });
 
-  // 🌟 MỚI: State lưu thời điểm bắt đầu đứng yên
-  const [myStationarySince, setMyStationarySince] = useState<number | null>(null);
-  const [partnerStationarySince, setPartnerStationarySince] = useState<number | null>(null);
-  const [currentTime, setCurrentTime] = useState<number>(Date.now()); // Để render lại UI mỗi phút
+  const [myStationarySince, setMyStationarySince] = useState<number | null>(() => {
+    const saved = localStorage.getItem('myStationarySince');
+    return saved ? parseInt(saved, 10) : null;
+  });
+  const [partnerStationarySince, setPartnerStationarySince] = useState<number | null>(() => {
+    const saved = localStorage.getItem('partnerStationarySince');
+    return saved ? parseInt(saved, 10) : null;
+  });
+
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
   const [isSharing, setIsSharing] = useState(() => {
     const saved = localStorage.getItem('isSharingLocation');
@@ -57,10 +74,9 @@ export const LiveLocation = () => {
   const isSharingRef = useRef(isSharing);
   const lastSentTime = useRef(0);
 
-  // Dùng để so sánh khoảng cách di chuyển thực tế
-  const lastFetchedMyCoords = useRef<[number, number] | null>(null);
-  const lastFetchedPartnerCoords = useRef<[number, number] | null>(null);
-  const myStationarySinceRef = useRef<number | null>(null);
+  const lastFetchedMyCoords = useRef<[number, number] | null>(myCoords);
+  const lastFetchedPartnerCoords = useRef<[number, number] | null>(partnerCoords);
+  const myStationarySinceRef = useRef<number | null>(myStationarySince);
 
   useEffect(() => { myCoordsRef.current = myCoords; }, [myCoords]);
   useEffect(() => { myBatteryRef.current = myBattery; }, [myBattery]);
@@ -69,13 +85,13 @@ export const LiveLocation = () => {
     localStorage.setItem('isSharingLocation', isSharing.toString());
   }, [isSharing]);
 
-  // Timer cập nhật thời gian thực tế mỗi phút để thay đổi chữ "1 phút", "2 phút"
+  // Cập nhật bộ đếm thời gian thực tế mỗi phút để tính toán "ở đây bao lâu"
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // 🌟 MỚI: Hàm định dạng thời gian dừng chân giống Zenly
+  // Định dạng thời gian dừng chân kiểu Zenly
   const formatIdleTime = (timestamp: number | null) => {
     if (!timestamp) return '';
     const diffMins = Math.floor((currentTime - timestamp) / 60000);
@@ -88,15 +104,10 @@ export const LiveLocation = () => {
 
   const fetchAddressName = async (lat: number, lng: number): Promise<string> => {
     try {
-      // 🌟 ĐÃ SỬA: Đổi &lng= thành &lon= 
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, {
-        headers: { 
-          // OpenStreetMap yêu cầu khai báo Accept-Language để trả về tiếng Việt
-          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7' 
-        } 
+        headers: { 'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8' }
       });
       const data = await response.json();
-      
       if (data) {
         if (data.name) {
           const street = data.address?.road || data.address?.suburb || '';
@@ -108,39 +119,32 @@ export const LiveLocation = () => {
       }
       return 'Không rõ địa danh';
     } catch (err) {
-      console.error("Lỗi lấy địa chỉ:", err);
       return 'Đang tải vị trí...';
     }
   };
-  // Quản lý việc dịch địa chỉ cho "Bạn"
+
   useEffect(() => {
-    if (!myCoords || !isSharing) {
-      setMyAddress('Chưa bật định vị');
-      return;
-    }
-    // Nếu khoảng cách thay đổi nhỏ hơn ~30m, coi như chưa đổi vị trí
+    if (!myCoords || !isSharing) return;
     if (lastFetchedMyCoords.current) {
       const delta = Math.abs(myCoords[0] - lastFetchedMyCoords.current[0]) + Math.abs(myCoords[1] - lastFetchedMyCoords.current[1]);
       if (delta < 0.0003) return;
     }
     fetchAddressName(myCoords[0], myCoords[1]).then(addr => {
       setMyAddress(addr);
+      localStorage.setItem('myAddress', addr);
       lastFetchedMyCoords.current = myCoords;
     });
   }, [myCoords, isSharing]);
 
-  // Quản lý việc dịch địa chỉ cho "Người ấy"
   useEffect(() => {
-    if (!partnerCoords) {
-      setPartnerAddress('Ngoại tuyến');
-      return;
-    }
+    if (!partnerCoords) return;
     if (lastFetchedPartnerCoords.current) {
       const delta = Math.abs(partnerCoords[0] - lastFetchedPartnerCoords.current[0]) + Math.abs(partnerCoords[1] - lastFetchedPartnerCoords.current[1]);
       if (delta < 0.0003) return;
     }
     fetchAddressName(partnerCoords[0], partnerCoords[1]).then(addr => {
       setPartnerAddress(addr);
+      localStorage.setItem('partnerAddress', addr);
       lastFetchedPartnerCoords.current = partnerCoords;
     });
   }, [partnerCoords]);
@@ -158,7 +162,7 @@ export const LiveLocation = () => {
     }
   }, []);
 
-  // Tổng đài giao tiếp WebSocket
+  // Tổng đài giao tiếp WebSocket công nghệ thời gian thực
   useEffect(() => {
     setTimeout(() => {
         apiClient.post('/couple/video/sync', { action: 'request_location_sync', payload: null }).catch(console.error);
@@ -176,18 +180,26 @@ export const LiveLocation = () => {
                 lng: myCoordsRef.current[1], 
                 battery: myBatteryRef.current?.level || null, 
                 isCharging: myBatteryRef.current?.isCharging || false,
-                stationarySince: myStationarySinceRef.current // Gửi cho đối phương biết mình đứng yên từ bao giờ
+                stationarySince: myStationarySinceRef.current
               }
            }).catch(console.error);
         }
       }
       else if (action === 'location_update' && payload.lat && payload.lng) {
-        setPartnerCoords([payload.lat, payload.lng]);
+        const pCoords: [number, number] = [payload.lat, payload.lng];
+        setPartnerCoords(pCoords);
+        localStorage.setItem('partnerLastCoords', JSON.stringify(pCoords));
+
         if (payload.battery !== undefined) {
           setPartnerBattery({ level: payload.battery, isCharging: payload.isCharging });
         }
         if (payload.stationarySince !== undefined) {
           setPartnerStationarySince(payload.stationarySince);
+          if (payload.stationarySince) {
+            localStorage.setItem('partnerStationarySince', payload.stationarySince.toString());
+          } else {
+            localStorage.removeItem('partnerStationarySince');
+          }
         }
       }
     };
@@ -196,7 +208,7 @@ export const LiveLocation = () => {
     return () => window.removeEventListener('sync_video_event', handleRemoteSignaling);
   }, []);
 
-  // Hàm phát sóng định vị (Heartbeat) và tính toán khoảng cách đứng yên
+  // Vòng lặp lấy vị trí liên tục và tối ưu hóa bộ nhớ đóng/mở tab
   useEffect(() => {
     let watchId: number;
     let heartbeatInterval: any;
@@ -210,25 +222,36 @@ export const LiveLocation = () => {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          
-          // 🌟 MỚI: Tính toán xem có đang di chuyển không
           const nowTime = Date.now();
-          if (lastFetchedMyCoords.current) {
-            const [lastLat, lastLng] = lastFetchedMyCoords.current;
+
+          // 🌟 THUẬT TOÁN ĐỘC LẬP: Đọc dữ liệu lịch sử cứng từ localStorage để đối chiếu việc đứng yên
+          const savedCoordsStr = localStorage.getItem('myLastCoords');
+          const savedStationaryStr = localStorage.getItem('myStationarySince');
+          
+          let updatedStationaryTime = nowTime;
+
+          if (savedCoordsStr && savedStationaryStr) {
+            const [lastLat, lastLng] = JSON.parse(savedCoordsStr);
             const delta = Math.abs(latitude - lastLat) + Math.abs(longitude - lastLng);
             
-            // Nếu di chuyển > ~30m, reset lại thời gian dừng
-            if (delta >= 0.0003) {
-              setMyStationarySince(nowTime);
-              myStationarySinceRef.current = nowTime;
+            if (delta < 0.0003) {
+              // Bạn vẫn đang đứng yên ở vị trí cũ dưới 30m -> Giữ nguyên mốc thời gian lịch sử
+              updatedStationaryTime = parseInt(savedStationaryStr, 10);
+            } else {
+              // Bạn đã thực sự dịch chuyển đi chỗ khác -> Cập nhật vị trí mới & tính giờ lại từ đầu
+              updatedStationaryTime = nowTime;
+              localStorage.setItem('myLastCoords', JSON.stringify([latitude, longitude]));
             }
           } else {
-            // Lần đầu lấy vị trí
-            setMyStationarySince(nowTime);
-            myStationarySinceRef.current = nowTime;
+            // Lần chạy đầu tiên chưa có lịch sử lưu trữ
+            localStorage.setItem('myLastCoords', JSON.stringify([latitude, longitude]));
           }
 
+          localStorage.setItem('myStationarySince', updatedStationaryTime.toString());
+          
           setMyCoords([latitude, longitude]);
+          setMyStationarySince(updatedStationaryTime);
+          myStationarySinceRef.current = updatedStationaryTime;
           setErrorMsg('');
 
           const now = Date.now();
@@ -239,7 +262,7 @@ export const LiveLocation = () => {
                 lat: latitude, lng: longitude, 
                 battery: myBatteryRef.current?.level, 
                 isCharging: myBatteryRef.current?.isCharging,
-                stationarySince: myStationarySinceRef.current
+                stationarySince: updatedStationaryTime
               }
             }).catch(console.error);
             lastSentTime.current = now;
@@ -267,10 +290,6 @@ export const LiveLocation = () => {
          }
       }, 4000);
 
-    } else {
-      setMyCoords(null);
-      setMyStationarySince(null);
-      myStationarySinceRef.current = null;
     }
 
     return () => {
@@ -279,8 +298,24 @@ export const LiveLocation = () => {
     };
   }, [isSharing]);
 
+  // Hàm xử lý bật/tắt thủ công sạch sẽ dữ liệu
+  const handleToggleSharing = () => {
+    const nextSharing = !isSharing;
+    setIsSharing(nextSharing);
+    if (!nextSharing) {
+      // Nếu chủ động ấn DỪNG CHIA SẺ -> Tiến hành xóa sạch bộ nhớ tạm định vị của bản thân
+      localStorage.removeItem('myLastCoords');
+      localStorage.removeItem('myStationarySince');
+      localStorage.removeItem('myAddress');
+      setMyCoords(null);
+      setMyStationarySince(null);
+      setMyAddress('Chưa bật định vị');
+      myStationarySinceRef.current = null;
+    }
+  };
+
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col h-[75vh] min-h-137.5 gap-4 p-4">
+    <div className="w-full max-w-5xl mx-auto flex flex-col h-[75vh] min-h-137.5 gap-4 p-4 pt-24">
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100">
         
@@ -295,7 +330,7 @@ export const LiveLocation = () => {
         </div>
 
         <div className="flex flex-col gap-2 justify-center bg-gray-50/80 p-3 sm:p-4 rounded-xl border border-gray-100 lg:col-span-1">
-          {/* Thông tin của BẠN */}
+          {/* Khu vực hiển thị thông tin của BẠN */}
           <div className="flex flex-col gap-0.5 border-b border-gray-200/60 pb-2">
             <div className="flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-500 rounded-full"></span> Bạn</span>
@@ -308,7 +343,6 @@ export const LiveLocation = () => {
             <span className="text-[11px] text-gray-500 truncate font-medium flex items-center gap-1 mt-0.5" title={myAddress}>
               <MapPin className="w-3 h-3 text-blue-500 shrink-0" /> {myAddress}
             </span>
-            {/* 🌟 MỚI: Hiển thị thời gian dừng chân của BẠN */}
             {isSharing && myStationarySince && (
               <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1 mt-0.5 ml-4">
                 <Clock className="w-3 h-3" /> {formatIdleTime(myStationarySince)}
@@ -316,7 +350,7 @@ export const LiveLocation = () => {
             )}
           </div>
 
-          {/* Thông tin của NGƯỜI ẤY */}
+          {/* Khu vực hiển thị thông tin của NGƯỜI ẤY */}
           <div className="flex flex-col gap-0.5 pt-1">
             <div className="flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1"><span className="w-2 h-2 bg-pink-500 rounded-full"></span> Người ấy</span>
@@ -329,7 +363,6 @@ export const LiveLocation = () => {
             <span className="text-[11px] text-gray-600 truncate font-semibold flex items-center gap-1 mt-0.5" title={partnerAddress}>
               <MapPin className="w-3 h-3 text-pink-500 shrink-0" /> {partnerAddress}
             </span>
-            {/* 🌟 MỚI: Hiển thị thời gian dừng chân của NGƯỜI ẤY */}
             {partnerCoords && partnerStationarySince && (
               <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1 mt-0.5 ml-4">
                 <Clock className="w-3 h-3" /> {formatIdleTime(partnerStationarySince)}
@@ -340,7 +373,7 @@ export const LiveLocation = () => {
 
         <div className="flex items-center lg:justify-end justify-start shrink-0">
           <button
-            onClick={() => setIsSharing(!isSharing)}
+            onClick={handleToggleSharing}
             className={`w-full lg:w-auto px-6 py-3 rounded-full font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95 ${
               isSharing 
                 ? 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-200' 
