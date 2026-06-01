@@ -202,6 +202,17 @@ export const LiveLocation = () => {
           }
         }
       }
+      // 🌟 MỚI: Nếu nhận được tín hiệu đối phương dừng chia sẻ, xóa vị trí của họ trên màn hình của mình
+      else if (action === 'stop_sharing') {
+        setPartnerCoords(null);
+        setPartnerStationarySince(null);
+        setPartnerBattery(null);
+        setPartnerAddress('Ngoại tuyến');
+        // Xóa luôn trong bộ nhớ tạm để F5 không bị hiện lại vị trí cũ của họ
+        localStorage.removeItem('partnerLastCoords');
+        localStorage.removeItem('partnerStationarySince');
+        localStorage.removeItem('partnerAddress');
+      }
     };
 
     window.addEventListener('sync_video_event', handleRemoteSignaling);
@@ -302,8 +313,15 @@ export const LiveLocation = () => {
   const handleToggleSharing = () => {
     const nextSharing = !isSharing;
     setIsSharing(nextSharing);
+    
     if (!nextSharing) {
-      // Nếu chủ động ấn DỪNG CHIA SẺ -> Tiến hành xóa sạch bộ nhớ tạm định vị của bản thân
+      // Bắn tín hiệu qua server báo cho đối phương biết mình đã dừng chia sẻ
+      apiClient.post('/couple/video/sync', { 
+        action: 'stop_sharing', 
+        payload: null 
+      }).catch(console.error);
+
+      // Tiến hành xóa sạch bộ nhớ tạm định vị của bản thân như cũ
       localStorage.removeItem('myLastCoords');
       localStorage.removeItem('myStationarySince');
       localStorage.removeItem('myAddress');
