@@ -374,19 +374,33 @@ export const LiveLocation = () => {
           </div>
 
           {/* Khu vực hiển thị thông tin của NGƯỜI ẤY */}
-          <div className="flex flex-col gap-0.5 pt-1">
+        <div className="flex flex-col gap-0.5 pt-1">
             <div className="flex items-center justify-between text-xs font-bold text-gray-700">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-pink-500 rounded-full"></span> Người ấy</span>
-              {partnerBattery ? (
+              <span className="flex items-center gap-1">
+                {/* Tự động đổi màu chấm tròn thành xám nếu đang tắt chia sẻ */}
+                <span className={`w-2 h-2 rounded-full ${partnerCoords ? 'bg-pink-500' : 'bg-gray-300'}`}></span> 
+                Người ấy
+              </span>
+              
+              {/* Xử lý hiển thị Pin */}
+              {partnerCoords && partnerBattery ? (
                 <span className="flex items-center gap-0.5 font-semibold text-pink-500">
                   {partnerBattery.isCharging ? <BatteryCharging className="w-3 h-3 text-green-500" /> : <Battery className="w-3 h-3" />} {partnerBattery.level}%
                 </span>
-              ) : <span className="text-[10px] text-gray-400">--%</span>}
+              ) : (
+                <span className="text-[10px] text-gray-400">--%</span>
+              )}
             </div>
-            <span className="text-[11px] text-gray-600 truncate font-semibold flex items-center gap-1 mt-0.5" title={partnerAddress}>
-              <MapPin className="w-3 h-3 text-pink-500 shrink-0" /> {partnerAddress}
+            
+            {/* Xử lý hiển thị Tên Địa Chỉ */}
+            <span className={`text-[11px] truncate font-semibold flex items-center gap-1 mt-0.5 ${partnerCoords ? 'text-gray-600' : 'text-gray-400'}`} title={partnerAddress}>
+              <MapPin className={`w-3 h-3 shrink-0 ${partnerCoords ? 'text-pink-500' : 'text-gray-400'}`} /> 
+              {/* NẾU có tọa độ nhưng đang chờ dịch tên đường -> Hiện chữ Đang tải thay vì chữ Ngoại tuyến */}
+              {partnerCoords ? (partnerAddress === 'Ngoại tuyến' ? 'Đang cập nhật vị trí...' : partnerAddress) : 'Ngoại tuyến'}
             </span>
-            {partnerCoords && partnerStationarySince && (
+            
+            {/* CHỈ hiện thời gian "Vừa mới tới" khi ĐÃ CÓ tọa độ VÀ địa chỉ không phải là Ngoại tuyến */}
+            {partnerCoords && partnerStationarySince && partnerAddress !== 'Ngoại tuyến' && (
               <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1 mt-0.5 ml-4">
                 <Clock className="w-3 h-3" /> {formatIdleTime(partnerStationarySince)}
               </span>
