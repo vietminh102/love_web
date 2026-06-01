@@ -235,7 +235,6 @@ export const LiveLocation = () => {
           const { latitude, longitude } = position.coords;
           const nowTime = Date.now();
 
-          // 🌟 THUẬT TOÁN ĐỘC LẬP: Đọc dữ liệu lịch sử cứng từ localStorage để đối chiếu việc đứng yên
           const savedCoordsStr = localStorage.getItem('myLastCoords');
           const savedStationaryStr = localStorage.getItem('myStationarySince');
           
@@ -246,15 +245,12 @@ export const LiveLocation = () => {
             const delta = Math.abs(latitude - lastLat) + Math.abs(longitude - lastLng);
             
             if (delta < 0.0003) {
-              // Bạn vẫn đang đứng yên ở vị trí cũ dưới 30m -> Giữ nguyên mốc thời gian lịch sử
               updatedStationaryTime = parseInt(savedStationaryStr, 10);
             } else {
-              // Bạn đã thực sự dịch chuyển đi chỗ khác -> Cập nhật vị trí mới & tính giờ lại từ đầu
               updatedStationaryTime = nowTime;
               localStorage.setItem('myLastCoords', JSON.stringify([latitude, longitude]));
             }
           } else {
-            // Lần chạy đầu tiên chưa có lịch sử lưu trữ
             localStorage.setItem('myLastCoords', JSON.stringify([latitude, longitude]));
           }
 
@@ -281,10 +277,11 @@ export const LiveLocation = () => {
         },
         (error) => {
           if (error.code === 1) setErrorMsg('Chưa cấp quyền GPS.');
-          else setErrorMsg('Không thể lấy vị trí.');
+          else setErrorMsg('Không thể lấy vị trí. Đang thử lại...');
           setIsSharing(false);
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        // marker sẽ hiện ra tức thì mà không bắt bạn chờ quá lâu!
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
       );
 
       heartbeatInterval = setInterval(() => {
@@ -315,20 +312,28 @@ export const LiveLocation = () => {
     setIsSharing(nextSharing);
     
     if (!nextSharing) {
-      // Bắn tín hiệu qua server báo cho đối phương biết mình đã dừng chia sẻ
+      // Bắn tín hiệu qua server báo cho đối phương biết
       apiClient.post('/couple/video/sync', { 
         action: 'stop_sharing', 
         payload: null 
       }).catch(console.error);
 
-      // Tiến hành xóa sạch bộ nhớ tạm định vị của bản thân như cũ
+      // Xóa bộ nhớ cục bộ
       localStorage.removeItem('myLastCoords');
       localStorage.removeItem('myStationarySince');
       localStorage.removeItem('myAddress');
+      
       setMyCoords(null);
       setMyStationarySince(null);
       setMyAddress('Chưa bật định vị');
       myStationarySinceRef.current = null;
+      
+      // Xóa cache vị trí cũ để không bị kẹt khi bật lại
+      lastFetchedMyCoords.current = null; 
+    } else {
+      //  Hiển thị trạng thái đang load để UI không bị đơ
+      setMyAddress('Đang kết nối GPS...');
+      setErrorMsg('');
     }
   };
 
