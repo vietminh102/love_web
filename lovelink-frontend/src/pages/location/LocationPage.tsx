@@ -6,7 +6,7 @@ export const LocationPage = () => {
     <div className="min-h-screen bg-[#fff5f7] pt-8 pb-12 flex flex-col items-center">
       
       {/* KHU VỰC TIÊU ĐỀ TRANG (HEADER) */}
-      <div className="w-full max-w-5xl px-4 text-center mb-6 animate-in slide-in-from-top-4">
+      <div className="w-full max-w-5xl px-4 text-center mb-6 animate-in slide-in-from-top-4 pt-24">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800 drop-shadow-sm">
           Bản Đồ Yêu Thương 🗺️
         </h1>

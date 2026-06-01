@@ -315,7 +315,7 @@ export const LiveLocation = () => {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col h-[75vh] min-h-137.5 gap-4 p-4 pt-24">
+    <div className="w-full max-w-5xl mx-auto flex flex-col h-[75vh] min-h-137.5 gap-4 p-4">
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100">
         
