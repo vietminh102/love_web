@@ -16,6 +16,7 @@ import ReminderPage from './pages/reminder/ReminderPage';
 import { GlobalDrawer } from './components/GlobalDrawer';
 import { AlarmOverlay } from './components/AlarmOverlay';
 import { Navbar } from './components/Navbar';
+import { FloatingChat } from './components/FloatingChat';
 
 // 1. Chốt chặn 1: Dành cho trang nội bộ (Phải đăng nhập)
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -56,6 +57,7 @@ const AppLayout = () => {
       <Navbar /> 
       <GlobalDrawer />
       <AlarmOverlay />
+      <FloatingChat />
       
       {/* Khung chứa nội dung các trang */}
       <div className="flex-1 overflow-y-auto relative z-10">

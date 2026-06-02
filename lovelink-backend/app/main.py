@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.nosql import connect_to_mongo, close_mongo_connection
-from app.api import auth, diary, gallery, notifications, lucky_wheel,video_sync,reminder,music
+from app.api import auth, diary, gallery, notifications, lucky_wheel,video_sync,reminder,music,chat
 from app.api import couple
 import asyncio
 from sqlalchemy import select
@@ -130,6 +130,7 @@ app.include_router(notifications.router)
 app.include_router(lucky_wheel.router)
 app.include_router(video_sync.router)
 app.include_router(music.router)
+app.include_router(chat.router)
 app.include_router(reminder.router)
 
 @app.get("/")

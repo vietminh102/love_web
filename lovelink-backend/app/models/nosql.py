@@ -4,6 +4,9 @@ from pydantic import Field,model_validator
 from typing import Optional
 from datetime import datetime, timezone
 from typing import List
+from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint, BigInteger
+from sqlalchemy.dialects.postgresql import UUID
+from app.models.postgres import Base
 
 class Diary(Document):
     title: str
@@ -71,3 +74,25 @@ class Reminder(Document):
 
     class Settings:
         name = "reminders" 
+
+class ChatMessage(Document):
+    couple_id: str
+    sender_id: str
+    msg_id: str
+    text: str
+    timestamp: int
+
+    class Settings:
+        # Tên collection trong MongoDB
+        name = "couple_chats"
+
+class ChatStatus(Base):
+    __tablename__ = "chat_status"
+
+    id = Column(Integer, primary_key=True, index=True)
+    couple_id = Column(UUID(as_uuid=True), ForeignKey("couples.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    last_read_time = Column(BigInteger, default=0, nullable=False)  # Lưu timestamp epoch ms
+
+    # Đảm bảo mỗi user trong một couple chỉ có duy nhất một dòng trạng thái
+    __table_args__ = (UniqueConstraint('couple_id', 'user_id', name='_couple_user_uc'),)
