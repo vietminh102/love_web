@@ -17,7 +17,7 @@ from app.api.cloudinary_utils import upload_image_to_cloud
 
 router = APIRouter(prefix="/gallery", tags=["Gallery"])
 
-# Đã xóa UPLOAD_DIR và os.makedirs vì không còn lưu ổ cứng nữa!
+
 
 async def get_user_couple(db_sql: AsyncSession, user_id: int):
     result = await db_sql.execute(
@@ -34,17 +34,16 @@ async def upload_photo(
     db_sql: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user)
 ):
-    # 1. 🌟 LÊN MÂY: Giao ảnh cho Cloudinary, lưu vào thư mục 'lovelink/gallery'
     cloud_url = upload_image_to_cloud(file.file, folder_name="lovelink/gallery")
     if not cloud_url:
         raise HTTPException(status_code=400, detail="Không thể tải ảnh lên mây lúc này!")
         
     image_url = cloud_url
 
-    # 2. Xử lý logic Độc thân/Cặp đôi
+    # Xử lý logic Độc thân/Cặp đôi
     couple = await get_user_couple(db_sql, current_user.id)
     
-    # 3. LƯU BẰNG BEANIE
+    # LƯU BẰNG BEANIE
     new_photo = Gallery(
         user_id=str(current_user.id), 
         couple_id=str(couple.id) if couple else None, 
@@ -52,7 +51,7 @@ async def upload_photo(
     )
     await new_photo.insert()
 
-    # 4. BẮN THÔNG BÁO CHO ĐỐI PHƯƠNG KHI ĐĂNG ẢNH MỚI
+    # THÔNG BÁO CHO ĐỐI PHƯƠNG
     if couple and couple.user1_id and couple.user2_id:
         current_user_id_str = str(current_user.id)
         user1_id_str = str(couple.user1_id)
@@ -132,8 +131,7 @@ async def delete_photo(
             if not couple or str(photo.couple_id) != str(couple.id):
                 raise HTTPException(status_code=403, detail="Bạn không có quyền xóa ảnh này")
 
-        # Xóa bản ghi trong Database. 
-        # (Ảnh gốc trên Cloudinary vẫn giữ làm backup an toàn, tránh xóa nhầm không cứu được).
+
         await photo.delete()
         return {"success": True, "message": "Đã xóa ảnh"}
     except Exception:

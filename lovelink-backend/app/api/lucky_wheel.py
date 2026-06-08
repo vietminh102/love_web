@@ -40,7 +40,7 @@ async def update_wheel_data(
     current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lưu và đồng bộ vòng quay chung của 2 người"""
+
     result = await db.execute(
         select(Couples).where((Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id))
     )
@@ -67,7 +67,7 @@ async def notify_wheel_spin(
     current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Gửi thông báo Realtime cho đối phương khi mình quay trúng"""
+   
     result = await db.execute(
         select(Couples).where((Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id))
     )
@@ -103,7 +103,7 @@ async def sync_wheel_spin(
     current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Gửi tín hiệu bắt đầu quay đồng bộ cho đối phương (Real-time)"""
+    
     result = await db.execute(
         select(Couples).where((Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id))
     )
@@ -113,7 +113,7 @@ async def sync_wheel_spin(
 
     partner_id = couple.user2_id if couple.user1_id == current_user.id else couple.user1_id
 
-    # 🌟 Bắn WebSocket trực tiếp (KHÔNG LƯU VÀO DATABASE THÔNG BÁO)
+
     await manager.send_personal_message({
         "type": "sync_wheel_spin", # Mã tín hiệu bí mật
         "prize_index": request.prize_index,

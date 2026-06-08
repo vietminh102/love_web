@@ -48,7 +48,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return !isAuthenticated ? <>{children}</> : <Navigate to="/home" replace />;
 };
 
-// 🌟 TẬP TRUNG GIAO DIỆN CHUNG VÀO ĐÂY (Đã tối ưu MusicProvider)
+
 const AppLayout = () => {
   return (
     <div className="w-full h-screen overflow-hidden flex flex-col relative bg-pink-50">
@@ -61,7 +61,7 @@ const AppLayout = () => {
       
       {/* Khung chứa nội dung các trang */}
       <div className="flex-1 overflow-y-auto relative z-10">
-        {/* 🌟 Đặt MusicProvider ở đây: Vừa chặn lỗi nhạc ma khi logout, vừa tối ưu cuộn trang */}
+       
         <MusicProvider>
           <Outlet /> 
         </MusicProvider>

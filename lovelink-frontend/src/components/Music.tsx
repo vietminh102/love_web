@@ -5,7 +5,7 @@ import { Music, VolumeX } from 'lucide-react';
 export default function BackgroundMusic() {
   const location = useLocation();
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null); // 🌟 Chỉ dùng 1 biến duy nhất này thôi
+  const audioRef = useRef<HTMLAudioElement>(null); 
   const hasAttemptedAutoPlay = useRef(false);
   const hasUserInteracted = useRef(false);
 
@@ -21,12 +21,12 @@ export default function BackgroundMusic() {
     }
   };
 
-  // 🌟 ĐÃ SỬA: Lắng nghe tiếng hét từ WatchTogether và MusicContext
+
   useEffect(() => {
     const handleStopBgMusic = () => {
       if (audioRef.current) {
-        audioRef.current.pause(); // Gọi đúng tên biến audioRef
-        setIsPlaying(false);      // 🌟 Cập nhật luôn UI để nút bấm chuyển về màu xám
+        audioRef.current.pause(); 
+        setIsPlaying(false);     
       }
     };
 

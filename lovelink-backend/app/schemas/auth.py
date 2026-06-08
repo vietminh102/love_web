@@ -2,10 +2,8 @@ from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
+from datetime import date
 
-# =====================================================================
-# 1. SCHEMAS REQUEST (Hứng dữ liệu từ Frontend gửi lên)
-# =====================================================================
 
 class UserRegister(BaseModel):
     """
@@ -24,14 +22,11 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-# =====================================================================
-# 2. SCHEMAS RESPONSE (Trả dữ liệu từ Backend về Frontend)
-# =====================================================================
+
 
 class UserResponse(BaseModel):
     """
     Schema chuẩn hóa thông tin User trả về cho Client.
-    Tuyệt đối KHÔNG chứa các trường nhạy cảm như password_hash.
     """
     id: UUID
     email: str
@@ -39,7 +34,7 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     created_at: datetime
     
-    # Cho phép Pydantic đọc dữ liệu trực tiếp từ Model SQLAlchemy (ORM)
+   
     model_config = ConfigDict(from_attributes=True)
 
 class UpdateResponse(BaseModel):
@@ -61,3 +56,12 @@ class Token(BaseModel):
 
 class EmailUpdate(BaseModel):
     new_email: str
+
+class OnboardingUpdate(BaseModel):
+    display_name: str
+    gender: str
+    dob: date
+
+#nhận Token từ Frontend
+class GoogleToken(BaseModel):
+    token: str

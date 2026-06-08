@@ -36,7 +36,7 @@ const handleGoogleSuccess = async (credentialResponse: any) => {
     const response = await authService.googleLogin(credentialResponse.credential);
     
     if (response.access_token) {
-      // 🌟 BƯỚC QUAN TRỌNG: Phải cất token vào két localStorage NGAY LẬP TỨC
+
       // để hàm getMe() ở dưới có "chìa khóa" mang đi gọi API
       localStorage.setItem('token', response.access_token);
       

@@ -1,8 +1,9 @@
-# File: app/core/security.py
+
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
 from app.core.config import settings
+
 
 # Cấu hình mã hóa mật khẩu dùng bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

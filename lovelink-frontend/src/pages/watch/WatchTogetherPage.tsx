@@ -12,7 +12,7 @@ const WatchTogetherPage = () => {
 
   // STATE YOUTUBE
   const [videoId, setVideoId] = useState('');
-  const [startSeconds, setStartSeconds] = useState(0); // 🌟 Thuốc đặc trị cho người vào sau
+  const [startSeconds, setStartSeconds] = useState(0); 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -34,7 +34,7 @@ const WatchTogetherPage = () => {
   const currentVideoIdRef = useRef(videoId);
   const currentViewModeRef = useRef(viewMode);
 
-  // 🌟 KHÓA THÔNG MINH CHỐNG DỘI LỆNH LÀM GIẬT LAG
+
   const isSyncingRef = useRef(false);
   const syncLockTimeoutRef = useRef<any>(null);
 
@@ -57,9 +57,7 @@ const WatchTogetherPage = () => {
     currentViewModeRef.current = viewMode;
   }, [videoId, viewMode]);
 
-  // ==========================================
-  // LẮNG NGHE TỔNG ĐÀI
-  // ==========================================
+
   useEffect(() => {
     const syncTimeout = setTimeout(() => {
       broadcastSignal('request_sync');
@@ -68,7 +66,7 @@ const WatchTogetherPage = () => {
     const handleRemoteSignaling = async (e: any) => {
       const { action, payload } = e.detail;
 
-      // 1. NGƯỜI KIA XIN ĐỒNG BỘ
+      // NGƯỜI KIA XIN ĐỒNG BỘ
       if (action === 'request_sync') {
         if (currentViewModeRef.current === 'youtube' && currentVideoIdRef.current && ytPlayerRef.current) {
           try {
@@ -86,7 +84,7 @@ const WatchTogetherPage = () => {
         }
       }
 
-      // 2. NHẬN ĐƯỢC TOÀN BỘ TRẠNG THÁI (Cho người vào sau)
+      // NHẬN ĐƯỢC TOÀN BỘ TRẠNG THÁI 
       else if (action === 'sync_full_state') {
         setViewMode('youtube');
         // Khóa lệnh 5s để tự do nạp phim mà không bắn bậy về máy Host
@@ -185,9 +183,9 @@ const WatchTogetherPage = () => {
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
-  // ==========================================
-  // LOGIC YOUTUBE
-  // ==========================================
+
+  //  YOUTUBE
+ 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
@@ -202,16 +200,15 @@ const WatchTogetherPage = () => {
   };
 
   const ytBroadcastAction = (action: string) => {
-    // 🌟 CHỐT CHẶN: Đang bị khóa (do nhận lệnh từ ng kia) thì tuyệt đối không cãi lại!
+
     if (isSyncingRef.current) return; 
     
     const payload = ytPlayerRef.current ? ytPlayerRef.current.getCurrentTime() : 0;
     broadcastSignal(action, payload);
   };
 
-  // ==========================================
+
   // LOGIC WEBRTC
-  // ==========================================
   const createPeerConnection = () => {
     if (pcRef.current) pcRef.current.close();
     const pc = new RTCPeerConnection(configuration);
@@ -286,9 +283,8 @@ const WatchTogetherPage = () => {
     return () => { stopAllStreams(); };
   }, []);
 
-  // ==========================================
-  // GIAO DIỆN
-  // ==========================================
+
+ 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 space-y-6 pt-24">
       <div className="text-center">
@@ -339,7 +335,7 @@ const WatchTogetherPage = () => {
                 {searchResults.map((video, idx) => (
                   <div key={`${video.videoId}-${idx}`} className="flex gap-3 items-start p-2 rounded-xl hover:bg-pink-50 cursor-pointer transition"
                     onClick={() => {
-                      setStartSeconds(0); // 🌟 Bấm bài mới thì bắt đầu từ 0s
+                      setStartSeconds(0); 
                       setVideoId(video.videoId); 
                       setSearchResults([]); 
                       broadcastSignal('change_url', video.videoId);
@@ -364,7 +360,7 @@ const WatchTogetherPage = () => {
                   width: '100%', 
                   playerVars: { 
                     autoplay: 1, 
-                    start: startSeconds // 🌟 ÉP YOUTUBE BẮT ĐẦU TỪ ĐÚNG SỐ GIÂY (Không cần seekTo)
+                    start: startSeconds 
                   } 
                 }} 
                 className="absolute inset-0 w-full h-full"
@@ -372,7 +368,7 @@ const WatchTogetherPage = () => {
                 onPause={() => ytBroadcastAction('pause')}
                 onReady={(e) => { 
                   ytPlayerRef.current = e.target; 
-                  // MỌI THỨ CÒN LẠI YOUTUBE SẼ TỰ LO NÊN KHÔNG CẦN SETTIMEOUT NỮA
+                 
                 }} 
               />
             ) : (

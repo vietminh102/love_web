@@ -1,9 +1,9 @@
-# File: app/db/postgres.py
+
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# Tạo engine kết nối từ chuỗi POSTGRES_URL trong file .env
+# Tạo engine kết nối
 engine = create_async_engine(
     settings.POSTGRES_URL, 
     echo=False,

@@ -18,14 +18,18 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-mee")
     brevo_api_key: Optional[str] = None
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 ngày
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  
     redis_url: str = "redis://localhost:6379"
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    
 
     # DAM MAY
     cloudinary_cloud_name: str
     cloudinary_api_key: str
     cloudinary_api_secret: str
 
-# ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT: Khởi tạo biến settings để các file khác import
+    # Google
+    google_client_id: str 
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+
 settings = Settings()

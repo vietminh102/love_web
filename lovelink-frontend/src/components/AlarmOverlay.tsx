@@ -70,19 +70,19 @@ export const AlarmOverlay = () => {
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-99999 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
         >
-          {/* 🌟 Đổi chớp đỏ thành chớp hồng nhẹ nhàng */}
+
           <div className="absolute inset-0 bg-pink-500/20 animate-pulse pointer-events-none" />
 
           <motion.div 
             initial={{ scale: 0.5, y: 50 }}
             animate={{ scale: 1, y: 0 }}
-            // 🌟 Đổi bóng tỏa ra thành màu hồng mộng mơ
+
             className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-[0_0_60px_rgba(236,72,153,0.5)] flex flex-col items-center text-center relative overflow-hidden border border-pink-100"
           >
             {/* Hiệu ứng sóng lan tỏa sau chuông */}
             <div className="absolute top-12 left-1/2 -translate-x-1/2 w-32 h-32 bg-pink-50 rounded-full animate-ping opacity-80" />
             
-            {/* 🌟 HIỆU ỨNG TRÁI TIM BAY LƠ LỬNG TRONG BẢNG THÔNG BÁO */}
+            {/* HIỆU ỨNG TRÁI TIM BAY LƠ LỬNG TRONG BẢNG THÔNG BÁO */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
               {randomHearts.map((heart) => (
                 <Heart
@@ -122,13 +122,13 @@ export const AlarmOverlay = () => {
       )}
 
       <style>{`
-        /* 🌟 Lắc nhẹ nhàng, thong thả (12 độ) */
+        /* Lắc nhẹ nhàng, thong thả (12 độ) */
         @keyframes gentle-wiggle {
           0%, 100% { transform: rotate(-12deg); }
           50% { transform: rotate(12deg); }
         }
         
-        /* 🌟 Hiệu ứng trái tim bay lên và mờ dần */
+        /* Hiệu ứng trái tim bay lên và mờ dần */
         @keyframes float-up {
           0% { transform: translateY(10px) scale(0.8); opacity: 0; }
           20% { opacity: 0.8; }

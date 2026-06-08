@@ -35,7 +35,7 @@ export const GlobalDrawer = () => {
       if (!ctx || !canvas) return;
 
       if (action === 'global_draw') {
-        // 🌟 GIẢI MÃ TỌA ĐỘ TỪ TÂM MÀN HÌNH ĐỂ KHỚP TỶ LỆ PC & MOBILE
+
         const minDim = Math.min(canvas.width, canvas.height);
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
@@ -68,7 +68,7 @@ export const GlobalDrawer = () => {
     apiClient.post('/couple/video/sync', { action, payload }).catch(console.error);
   };
 
-  // 🌟 CÔNG THỨC TOÁN HỌC NEO VÀO TÂM MÀN HÌNH
+  //  NEO VÀO TÂM MÀN HÌNH
   const getCoordinates = (e: any) => {
     const canvas = canvasRef.current;
     if (!canvas) return { localX: 0, localY: 0, normX: 0, normY: 0 };
@@ -82,9 +82,9 @@ export const GlobalDrawer = () => {
     const centerY = canvas.height / 2;
 
     return {
-      localX: clientX, // Tọa độ thực tế để tự vẽ lên máy mình
+      localX: clientX, 
       localY: clientY,
-      normX: (clientX - centerX) / minDim, // Tọa độ chuẩn hóa để gửi đi
+      normX: (clientX - centerX) / minDim, 
       normY: (clientY - centerY) / minDim
     };
   };
@@ -98,13 +98,13 @@ export const GlobalDrawer = () => {
   const draw = (e: any) => {
     if (!isDrawing.current || !isDrawingMode) return;
     
-    // KHÔNG dùng e.preventDefault() ở đây để tránh lỗi "Unable to preventDefault..." trên điện thoại
+    
     const newPos = getCoordinates(e);
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     
     if (ctx && canvas) {
-      // Vẽ lên màn hình của chính mình (dùng tọa độ thực)
+      
       ctx.beginPath();
       ctx.moveTo(lastPos.current.localX, lastPos.current.localY);
       ctx.lineTo(newPos.localX, newPos.localY);
@@ -136,7 +136,7 @@ export const GlobalDrawer = () => {
 
   return (
     <>
-      {/* 🌟 TẤM KÍNH TRONG SUỐT PHỦ KÍN TRANG WEB */}
+      {/* TẤM KÍNH TRONG SUỐT PHỦ KÍN TRANG WEB */}
       <canvas
         ref={canvasRef}
         // z-[9998] để nằm dưới Modal Ảnh Fullscreen một chút nhưng đè lên mọi thứ khác
@@ -146,7 +146,7 @@ export const GlobalDrawer = () => {
         onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
       />
 
-      {/* 🌟 NÚT BẬT/TẮT CÔNG CỤ VẼ (TRÔI NỔI GÓC DƯỚI) */}
+      {/* NÚT BẬT/TẮT CÔNG CỤ VẼ  */}
       <div className="fixed bottom-10 right-6 z-9999 flex flex-col items-end gap-3">
         
         {/* Hộp màu hiện ra khi bật chế độ vẽ */}

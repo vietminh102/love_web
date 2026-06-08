@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 async def send_reminder_email(to_email: str, title: str, message_content: str):
-    # 🌟 ĐIỀN THÔNG TIN CỦA BẠN VÀO ĐÂY
     BREVO_API_KEY = os.getenv("BREVO_API_KEY")
     SENDER_EMAIL = "thongbaolovee@gmail.com" 
 
@@ -16,7 +15,7 @@ async def send_reminder_email(to_email: str, title: str, message_content: str):
         "content-type": "application/json"
     }
     
-    # Giao diện HTML giữ nguyên không thay đổi
+
     html_content = f"""
     <html>
         <body style="font-family: Arial, sans-serif; background-color: #fdf2f8; padding: 20px;">

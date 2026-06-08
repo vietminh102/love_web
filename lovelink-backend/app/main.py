@@ -29,12 +29,11 @@ async def run_milestone_scheduler():
         except Exception as e:
             print(f"Lỗi khi chạy quét ngày kỷ niệm: {e}")
             
-        # Nghỉ ngơi 12 tiếng rồi quét lại tiếp (12 * 60 * 60 giây = 43200)
+        
         await asyncio.sleep(43200)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 👇 Ra lệnh cho Postgres xây nhà dựa trên bản vẽ (Base)
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -42,14 +41,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Lỗi khi tạo bảng Postgres: {e}")
 
-    # Chạy khi server khởi động
+    
     await connect_to_mongo()
     print("✅ Đã kết nối MongoDB và khởi tạo Beanie thành công!")
     print("🚀 Server đang chạy...")
 
     asyncio.create_task(run_milestone_scheduler())
     yield
-    # Chạy khi server tắt
+
     await close_mongo_connection()
 
 app = FastAPI(lifespan=lifespan)
@@ -76,14 +75,13 @@ async def background_alarm_worker():
                             couple_obj = (await db.execute(stmt_couple)).scalars().first()
                             
                             if couple_obj:
-                                # 1. Xác định ID người nhận (đối phương)
+
                                 partner_id = couple_obj.user1_id if str(couple_obj.user1_id) != str(r.created_by) else couple_obj.user2_id
                                 
-                                # 2. Truy vấn lấy thông tin đối phương
                                 stmt_partner = select(Users).where(Users.id == partner_id)
                                 partner_obj = (await db.execute(stmt_partner)).scalars().first()
                                 
-                                # 3. Truy vấn lấy thông tin người tạo (chính bạn)
+   
                                 stmt_creator = select(Users).where(Users.id == r.created_by)
                                 creator_obj = (await db.execute(stmt_creator)).scalars().first()
                                 
@@ -104,21 +102,21 @@ async def background_alarm_worker():
         except Exception as e:
             print(f"❌ Lỗi Bác bảo vệ chạy ngầm: {e}")
             
-        # Hệ thống đi tuần định kỳ mỗi 1 phút (60 giây)
+        # Hệ thống đi tuần định kỳ mỗi 1 phút 
         await asyncio.sleep(60)
-# KÍCH HOẠT BÁC BẢO VỆ KHI SERVER VỪA BẬT LÊN
+
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(background_alarm_worker())
     print("🚀 Bác bảo vệ canh báo thức Email đã thức dậy!")
 
-# app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://love-web-steel.vercel.app"], 
     allow_credentials=True,
-    allow_methods=["*"], # Cho phép GET, POST, PUT, DELETE...
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

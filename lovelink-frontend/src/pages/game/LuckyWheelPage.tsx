@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, Gift, ArrowDown, RefreshCw, Settings, Trash2, Plus, Save, X } from 'lucide-react';
-import apiClient from '../../services/apiClient'; // Mượn apiClient để gọi API đồng bộ
+import apiClient from '../../services/apiClient'; 
 
-// Phần thưởng mặc định nếu cặp đôi chưa tự cấu hình
+
 const DEFAULT_PRIZES = [
   { id: 1, text: 'Một cái ôm thật chặt', color: '#fdf2f8', textColor: '#be185d' },
   { id: 2, text: 'Người ấy rửa bát', color: '#fbcfe8', textColor: '#be185d' },
@@ -61,7 +61,7 @@ const startSpinning = (targetIndex: number, isRemote = false, autoDeleteCurrent 
     if (!isRemote) {
       apiClient.post('/couple/wheel/sync-spin', { 
         prize_index: targetIndex,
-        is_auto_delete: autoDeleteCurrent // Bắn trạng thái nút sang máy kia
+        is_auto_delete: autoDeleteCurrent 
       }).catch(e => console.log(e));
     }
 
@@ -72,7 +72,7 @@ const startSpinning = (targetIndex: number, isRemote = false, autoDeleteCurrent 
 
       setWonPrize(targetPrize.text);
 
-      // 🌟 XỬ LÝ TỰ ĐỘNG XÓA KHI QUAY TRÚNG
+
       if (autoDeleteCurrent) {
         setPrizes((prevPrizes) => {
           const updated = prevPrizes.filter((_, idx) => idx !== targetIndex);
@@ -142,7 +142,7 @@ const startSpinning = (targetIndex: number, isRemote = false, autoDeleteCurrent 
     if (prizes.length < 2) return alert("Vui lòng để lại ít nhất 2 phần thưởng!");
     setIsLoading(true);
     try {
-      // 🌟 GỌI API LƯU VÒNG QUAY CHUNG CHO CẢ 2 NGƯỜI
+      
       await apiClient.put('/couple/wheel', { prizes });
       setIsEditing(false);
       alert("Đã đồng bộ vòng quay với người ấy! 💕");
@@ -247,7 +247,7 @@ const startSpinning = (targetIndex: number, isRemote = false, autoDeleteCurrent 
         {isSpinning ? 'Đang quay...' : 'Quay ngay!'}
       </button>
 
-      {/* 🌟 MODAL TÙY CHỈNH VÒNG QUAY */}
+  
       <AnimatePresence>
         {isEditing && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

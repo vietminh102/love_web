@@ -18,6 +18,6 @@ class ReminderResponse(BaseModel):
     is_triggered: bool
 
     class Config:
-        # Hỗ trợ tự động map dữ liệu từ Beanie Document sang Schema
+        
         orm_mode = True 
         from_attributes = True

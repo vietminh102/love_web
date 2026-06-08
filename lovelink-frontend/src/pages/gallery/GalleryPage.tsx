@@ -262,7 +262,7 @@ export function GalleryPage() {
       )}
 
       {/* MODAL XEM ẢNH FULLSCREEN */}
-      {/* 🌟 ĐÃ NÂNG CẤP: Đặt AnimatePresence vào TRONG createPortal và dùng z-[9999] */}
+
       {createPortal(
         <AnimatePresence>
           {selectedPhoto && (

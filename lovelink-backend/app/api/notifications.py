@@ -4,7 +4,7 @@ import jwt
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.sql import get_db
-from app.core.config import settings # Đảm bảo đường dẫn này đúng với file config JWT của bạn
+from app.core.config import settings
 from app.models.Users import Users
 from app.models.Couples import Couples
 from app.api.deps import get_current_user
@@ -17,12 +17,12 @@ import json
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 async def check_and_send_milestones(db_sql):
-    # 1. XỬ LÝ THỜI GIAN CHUẨN MỰC
+    # XỬ LÝ THỜI GIAN CHUẨN MỰC
     VN_TZ = timezone(timedelta(hours=7))
     now_vn = datetime.now(VN_TZ)
     today = now_vn.date()
     
-    # Chốt mốc 00:00:00 hôm nay theo giờ VN, sau đó ép sang chuẩn UTC để query MongoDB
+   
     start_of_today_vn = now_vn.replace(hour=0, minute=0, second=0, microsecond=0)
     start_of_today_utc = start_of_today_vn.astimezone(timezone.utc)
     
@@ -41,9 +41,7 @@ async def check_and_send_milestones(db_sql):
         if not u1 or not u2:
             continue
 
-        # ==========================================
-        # PHẦN 1: KIỂM TRA & GỬI THÔNG BÁO SINH NHẬT
-        # ==========================================
+        # KIỂM TRA & GỬI THÔNG BÁO SINH NHẬT
         for user_chinh, doi_phuong in [(u1, u2), (u2, u1)]:
             bday_raw = getattr(user_chinh, 'dob', None)
             if bday_raw:
@@ -71,7 +69,7 @@ async def check_and_send_milestones(db_sql):
                         )
                         await notif.insert()
                         
-                        # 🌟 SỬA TẠI ĐÂY: Vá lại múi giờ UTC bị mất sau khi insert
+                        
                         notif_dt = notif.created_at
                         if notif_dt.tzinfo is None:
                             notif_dt = notif_dt.replace(tzinfo=timezone.utc)
@@ -84,46 +82,38 @@ async def check_and_send_milestones(db_sql):
                             "type": notif.type, 
                             "is_read": False, 
                             "link": notif.link, 
-                            "created_at": notif_dt.isoformat() # <-- Dùng thời gian đã vá
+                            "created_at": notif_dt.isoformat() 
                         }, str(doi_phuong.id))
 
-        # ==========================================
-        # PHẦN 2: KIỂM TRA & GỬI THÔNG BÁO NGÀY YÊU
-        # ==========================================
+        # KIỂM TRA & GỬI THÔNG BÁO NGÀY YÊU
         start_date_raw = getattr(couple, 'start_date', None)
         if start_date_raw:
-            # 1. QUY ĐỔI MỌI THỨ VỀ DATETIME CÓ MÚI GIỜ VN (Đồng bộ tuyệt đối với UI)
+
             if not isinstance(start_date_raw, datetime):
-                # Nếu DB vô tình lưu kiểu Date thuần, gán cho nó là 00:00:00
                 start_date_raw = datetime.combine(start_date_raw, datetime.min.time())
             
-            # Gắn múi giờ VN vào để so sánh chuẩn xác (Vì DB PostgreSQL thường lưu naive timezone)
             if start_date_raw.tzinfo is None:
                 start_date_exact = start_date_raw.replace(tzinfo=VN_TZ)
             else:
                 start_date_exact = start_date_raw.astimezone(VN_TZ)
 
-            # 🌟 2. TÍNH TOÁN BẰNG ĐỒNG HỒ (Giống hệt cách JS trên UI làm)
-            # Tính tổng số giây đã trôi qua, sau đó chia cho 86400 (số giây trong 1 ngày)
             diff_seconds = (now_vn - start_date_exact).total_seconds()
             
-            # Bỏ qua nếu thời gian bắt đầu ở trong tương lai
+            # Bỏ qua nếu bắt đầu ở trong tương lai
             if diff_seconds < 0:
                 continue
                 
-            # Phép chia lấy phần nguyên (//) sẽ ép Python ra số 99 y như Frontend!
+
             days_together = int(diff_seconds // 86400) 
 
-            # A. Kiểm tra mốc 100, 200, 300... ngày
             is_special_days = (days_together % 100 == 0 and days_together != 0)
             
-            # B. Kỷ niệm Năm (Sinh nhật/Ngày kỷ niệm năm thì vẫn phải dùng Tờ lịch)
+            # Kỷ niệm Năm 
             start_date_raw = getattr(couple, 'start_date', None)
         if start_date_raw:
             if not isinstance(start_date_raw, datetime):
                 start_date_raw = datetime.combine(start_date_raw, datetime.min.time())
             
-            # 🌟 VÁ LỖI TIMEZONE: DB lưu giờ Quốc tế (UTC), phải gắn mác UTC rồi mới dịch ra VN_TZ
             if start_date_raw.tzinfo is None:
                 start_date_raw = start_date_raw.replace(tzinfo=timezone.utc)
             start_date_exact = start_date_raw.astimezone(VN_TZ)
@@ -136,16 +126,15 @@ async def check_and_send_milestones(db_sql):
                 
             days_together = int(diff_seconds // 86400) 
 
-            # A. Kiểm tra mốc 100, 200, 300... ngày
+            # Kiểm tra mốc 100, 200, 300
             is_special_days = (days_together % 100 == 0 and days_together != 0)
             
-            # B. Kỷ niệm Năm (Vẫn phải dùng Tờ lịch)
+            # Năm 
             start_date_calendar = start_date_exact.date()
             is_anniversary_year = (start_date_calendar.month == today.month and start_date_calendar.day == today.day and today.year > start_date_calendar.year)
 
             if is_special_days or is_anniversary_year:
                 for user_nhan in [u1_id, u2_id]:
-                    # Trả lại type="anniversary_milestone" để Frontend hiển thị đúng Icon
                     exists = await Notification.find(
                         Notification.user_id == user_nhan,
                         Notification.type == "anniversary_milestone", 
@@ -168,7 +157,7 @@ async def check_and_send_milestones(db_sql):
                         )
                         await notif.insert()
                         
-                        # Vá lại múi giờ UTC bị mất sau khi insert
+
                         notif_dt = notif.created_at
                         if notif_dt.tzinfo is None:
                             notif_dt = notif_dt.replace(tzinfo=timezone.utc)
@@ -182,10 +171,9 @@ async def check_and_send_milestones(db_sql):
                             "link": notif.link, 
                             "created_at": notif_dt.isoformat()
                         }, user_nhan)
-# TRẠM PHÁT SÓNG WEBSOCKET (Connection Manager)
+# TRẠM PHÁT SÓNG WEBSOCKET 
 class ConnectionManager:
     def __init__(self):
-        # Lưu trữ các kết nối đang online: { "user_id": [websocket1, websocket2] }
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
@@ -201,14 +189,13 @@ class ConnectionManager:
                 del self.active_connections[user_id]
 
     async def send_personal_message(self, message: dict, user_id: str):
-        """Hàm bắn thông báo realtime cho 1 user cụ thể nếu họ đang online"""
         if user_id in self.active_connections:
             for connection in self.active_connections[user_id]:
                 await connection.send_text(json.dumps(message))
 
 manager = ConnectionManager()
 
-# 1. API Lấy danh sách thông báo cũ (Lúc user vừa vào app)
+# API Lấy danh sách thông báo cũ 
 @router.get("/")
 async def get_notifications(current_user: Users = Depends(get_current_user)):
     # Lấy 20 thông báo gần nhất
@@ -228,9 +215,9 @@ async def get_notifications(current_user: Users = Depends(get_current_user)):
         } for n in notifications
     ]
 
-# 2. ENDPOINT KẾT NỐI WEBSOCKET
+# KẾT NỐI WEBSOCKET
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = None): # Thêm = None để không bị chặn ngoài cửa
+async def websocket_endpoint(websocket: WebSocket, token: str = None): 
     """Client sẽ kết nối vào đây bằng ws://.../ws?token=ABC"""
     try:
         if not token or token == "null" or token == "undefined":
@@ -238,26 +225,25 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None): # Thêm =
             await websocket.close(code=1008)
             return
             
-        # 1. DỌN RÁC TOKEN: Cắt bỏ chữ Bearer và dấu nháy nếu lỡ dính vào
+        # DỌN RÁC TOKEN
         clean_token = token.replace("Bearer ", "").replace('"', '').replace("'", "")
         
-        # 2. Giải mã token
+        # Giải mã token
         payload = jwt.decode(clean_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = str(payload.get("sub"))
         
     except Exception as e:
-        # IN LỖI RA RENDER LOG ĐỂ DỄ DÀNG BẮT TẬN TAY
         print(f"❌ Lỗi giải mã Token WebSocket: {str(e)}") 
         await websocket.close(code=1008)
         return
 
-    # 3. Kết nối thành công
+    # Kết nối
     await manager.connect(websocket, user_id)
     print(f"✅ User {user_id} đã kết nối Realtime thành công!")
     
     try:
         while True:
-            # Chờ nhận tin nhắn từ client (nhịp tim keep-alive)
+          
             await websocket.receive_text()
             
     except WebSocketDisconnect:
@@ -271,8 +257,8 @@ async def mark_as_read(notif_id: str, current_user: Users = Depends(get_current_
         
         # Kiểm tra nếu thông báo tồn tại và thuộc về đúng user đang đăng nhập
         if notif and notif.user_id == str(current_user.id):
-            notif.is_read = True # Chuyển trạng thái thành Đã đọc
-            await notif.save()   # Lưu lại vào MongoDB
+            notif.is_read = True 
+            await notif.save()   
             return {"success": True}
             
         return {"success": False, "detail": "Không tìm thấy thông báo"}
@@ -289,7 +275,7 @@ async def delete_notification(
         
         # Kiểm tra nếu thông báo tồn tại và thuộc về đúng người đang đăng nhập
         if notif and notif.user_id == str(current_user.id):
-            await notif.delete() # Xóa khỏi MongoDB
+            await notif.delete() 
             return {"success": True, "message": "Đã xóa thông báo"}
             
         raise HTTPException(status_code=404, detail="Không tìm thấy thông báo")
@@ -310,7 +296,6 @@ async def clear_all_notifications(
     
 @router.get("/test-milestones")
 async def trigger_test_milestones(db_sql: AsyncSession = Depends(get_db)):
-    """API Bí mật để ép hệ thống quét ngày kỷ niệm ngay lập tức"""
     try:
         await check_and_send_milestones(db_sql)
         return {"success": True, "message": "Đã chạy quét sự kiện thành công! Hãy kiểm tra chuông."}

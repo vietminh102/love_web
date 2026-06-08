@@ -10,20 +10,20 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
 
 
-  // 🌟 State mới để quản lý ảnh đại diện
+ 
   const [avatarUrl, setAvatarUrl] = useState(storedUser.avatar_url || 'https://via.placeholder.com/150');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null); // Lưu file thật để upload
+  const [avatarFile, setAvatarFile] = useState<File | null>(null); 
   
   // Dùng Ref để kích hoạt nút chọn file ẩn
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🌟 Hàm xử lý khi user chọn file ảnh mới
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setAvatarFile(file); // Lưu file thật
       
-      // Tạo URL tạm thời để hiển thị xem trước (preview)
+  
       const reader = new FileReader();
       reader.onload = (event) => {
         setAvatarUrl(event.target?.result as string);
@@ -51,7 +51,7 @@ export default function OnboardingPage() {
         // Lưu user tạm thời
         let updatedUser = onboardingResponse.user;
 
-        // 2. 🌟 NẾU CÓ CHỌN FILE ẢNH MỚI -> Gọi API tải ảnh lên
+
         if (avatarFile) {
           try {
             const avatarResponse = await authService.uploadAvatar(avatarFile);
@@ -85,7 +85,7 @@ export default function OnboardingPage() {
         
         <form onSubmit={handleSubmit} className="text-left space-y-5">
           
-          {/* 🌟 THÊM: KHU VỰC SỬA ẢNH ĐẠI DIỆN */}
+        
           <div className="flex flex-col items-center gap-2 mb-4">
             <div className="relative group">
               <img 

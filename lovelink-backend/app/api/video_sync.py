@@ -14,7 +14,6 @@ import yt_dlp
 import asyncio
 
 
-# Đảm bảo đường dẫn này trỏ đúng tới file chứa biến 'manager' của bạn
 from app.api.notifications import manager 
 from app.schemas.video_sync import VideoSyncRequest
 
@@ -59,26 +58,24 @@ async def search_youtube_unlimited(q: str = Query(..., description="Từ khóa t
         ydl_opts = {
             'format': 'best',
             'noplaylist': True,
-            'extract_flat': True, #  Chỉ lấy thông tin Meta (tên, ID, ảnh), TUYỆT ĐỐI không tải video để API chạy siêu nhanh
+            'extract_flat': True, 
             'quiet': True
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # ytsearch6: Lấy đúng 6 kết quả đầu tiên
             return ydl.extract_info(f"ytsearch6:{q}", download=False)
 
     try:
        
-        # hay chặn các luồng WebSocket (WebRTC) đang chạy ngầm của bạn!
         result = await asyncio.to_thread(fetch_youtube_data)
         
         formatted_results = []
         if 'entries' in result:
             for entry in result['entries']:
-                # Tránh lỗi NoneType: yt-dlp có thể trả về None nếu video bị ẩn/lỗi
+
                 if not entry:
                     continue
                 
-                # Xử lý lấy ảnh Thumbnail an toàn
+
                 thumbnails = entry.get("thumbnails", [])
                 thumbnail_url = thumbnails[0].get("url") if thumbnails else "https://via.placeholder.com/320x180.png?text=No+Image"
                 

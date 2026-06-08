@@ -18,7 +18,7 @@ def get_server_timestamp():
     # Sử dụng UTC chuẩn để tránh mọi sai lệch về múi giờ
     return int(datetime.now(timezone.utc).timestamp() * 1000)
 
-# 1. API GỬI TIN NHẮN 
+#  API GỬI TIN NHẮN 
 @router.post("/send")
 async def send_couple_message(
     payload: dict,
@@ -34,7 +34,6 @@ async def send_couple_message(
     if not couple or not couple.user2_id:
         raise HTTPException(status_code=400, detail="Chưa ghép đôi")
 
-    # Ép buộc 100% dùng đồng hồ của Server để tránh lệch pha giữa 2 điện thoại
     msg_timestamp = get_server_timestamp()
 
     try:
@@ -63,7 +62,7 @@ async def send_couple_message(
     return {"status": "Thành công"}
 
 
-# 2. API LẤY LỊCH SỬ CHAT
+# API LẤY LỊCH SỬ CHAT
 @router.get("/history")
 async def get_chat_history(
     current_user: Users = Depends(get_current_user),
@@ -97,7 +96,7 @@ async def get_chat_history(
         return {"messages": []}
 
 
-# 3. API LẤY SỐ LƯỢNG TIN CHƯA ĐỌC
+# API LẤY SỐ LƯỢNG TIN CHƯA ĐỌC
 @router.get("/unread-count")
 async def get_unread_chat_count(
     current_user: Users = Depends(get_current_user),
@@ -133,7 +132,7 @@ async def get_unread_chat_count(
         return {"unread_count": 0}
 
 
-# 4. API ĐÁNH DẤU ĐÃ ĐỌC
+#  API ĐÁNH DẤU ĐÃ ĐỌC
 @router.post("/mark-read")
 async def mark_chat_as_read(
     current_user: Users = Depends(get_current_user),

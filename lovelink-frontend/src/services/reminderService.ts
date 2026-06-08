@@ -25,10 +25,10 @@ export const reminderService = {
     return response.data;
   },
 
-  // 🌟 ĐÃ THÊM LOGIC MỚI: Kiểm tra trạng thái Email của cặp đôi
+
   checkEmailStatus: async () => {
-    // Vì apiClient của bạn đã tự động đính kèm Token ngầm rồi (thông qua interceptors),
-    // nên ta không cần truyền tay thủ công { headers: { Authorization... } } nữa cho đỡ dài dòng.
+
+
     const response = await apiClient.get('/reminders/check-email-status');
     return response.data;
   }

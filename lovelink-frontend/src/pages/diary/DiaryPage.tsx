@@ -133,7 +133,7 @@ export function DiaryPage() {
 }
 
 function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void, onSave: (entry: DiaryEntry, isEdit?: boolean) => void, initialData?: DiaryEntry | null }) {
-  // 🌟 Đã xóa API_BASE_URL ở đây
+ 
   const { user } = useAuth();
   const [title, setTitle] = useState(initialData?.title || '');
   const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
@@ -309,7 +309,7 @@ function WriteDiaryModal({ onClose, onSave, initialData }: { onClose: () => void
             
             {previewUrl && (
               <div className="mt-2 h-32 w-full rounded-lg overflow-hidden border border-pink-200 relative shadow-sm">
-                {/* 🌟 Đã gọi trực tiếp previewUrl, không nối ghép */}
+  
                 <img 
                   src={previewUrl}
                   alt="Preview" 
@@ -373,7 +373,7 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
   const [showHearts, setShowHearts] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false); 
-  // 🌟 Đã xóa API_BASE_URL ở đây
+
 
   const [likedByData, setLikedByData] = useState<string[]>(entry.liked_by || []);
   
@@ -503,7 +503,7 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
           {entry.image_url && (
             <div className="w-full h-55 rounded-2xl overflow-hidden mb-4 relative cursor-pointer"
             onClick={() => setSelectedImage(entry.image_url ?? null)} >
-              {/* 🌟 Đã gọi trực tiếp entry.image_url, không nối ghép */}
+
               <img 
                 src={entry.image_url} 
                 alt={entry.title} 
@@ -562,7 +562,7 @@ function DiaryEntryCard({ entry, index, currentUserId, currentUserGender, onEdit
           >
             <X className="w-6 h-6" />
           </button>
-          {/* 🌟 Đã gọi trực tiếp selectedImage, không nối ghép */}
+
           <img 
             src={selectedImage} 
             alt="Phóng to" 

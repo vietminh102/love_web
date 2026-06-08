@@ -1,4 +1,3 @@
-import os
 import random
 import string
 from datetime import datetime
@@ -9,42 +8,33 @@ from google.auth.transport import requests
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from datetime import date
 
-# Import từ các module của bạn
 from app.db.sql import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.models.Users import Users
 from app.models.Couples import Couples
 from app.api.deps import get_current_user
-from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse, UpdateResponse,EmailUpdate
+from app.schemas.auth import UserRegister, UserLogin, Token, UserResponse, UpdateResponse,EmailUpdate,OnboardingUpdate,GoogleToken
 
 
 from app.api.cloudinary_utils import upload_image_to_cloud
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Đã xóa phần khởi tạo thư mục UPLOAD_DIR vì không còn lưu ổ cứng nữa!
-
+# Sinh ma ghep doi
 def generate_pairing_code(length=8):
-    """Sinh mã ghép đôi ngẫu nhiên"""
     chars = string.ascii_uppercase + string.digits
     return "VYL-" + "".join(random.choices(chars, k=length-4))
 
-class OnboardingUpdate(BaseModel):
-    display_name: str
-    gender: str
-    dob: date # Định dạng dạng: YYYY-MM-DD
 
-# Khai báo schema nhận Token từ Frontend
-class GoogleToken(BaseModel):
-    token: str
-
-GOOGLE_CLIENT_ID = "337450123524-tuj4ps93vtb43nd79joar6rnj8rrue4u.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 @router.get("/me")
 async def get_current_user_info(current_user: Users = Depends(get_current_user)):
-    """API để Frontend tự động kéo thông tin mới nhất mỗi khi load web"""
     return {
         "id": str(current_user.id),
         "email": current_user.email,
@@ -94,23 +84,22 @@ async def google_login(data: GoogleToken, db: AsyncSession = Depends(get_db)):
         user = result.scalars().first()
 
         if not user:
-            # 4. Nếu chưa có -> Tự động tạo tài khoản mới (Đăng ký ngầm)
+            # 4. Tự động tạo tài khoản mới
             new_user = Users(
                 email=user_email,
                 display_name=user_name,
                 avatar_url=avatar_url,
-                password_hash="GOOGLE_ACCOUNT", # Đánh dấu nick Google
+                password_hash="GOOGLE_ACCOUNT",
             )
             db.add(new_user)
             await db.flush() 
 
             new_couple = Couples(
                 user1_id=new_user.id,
-                pairing_code=generate_pairing_code() # Sinh mã VYL-XXXX
+                pairing_code=generate_pairing_code() 
             )
             db.add(new_couple)
-            
-            # Commit lưu cả User và Couple chính thức vào Database
+      
             await db.commit()
             await db.refresh(new_user)
             user = new_user
@@ -135,7 +124,7 @@ async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_
         try:
             parsed_dob = datetime.strptime(user_data.dob, "%Y-%m-%d").date()
         except ValueError:
-            pass # Hoặc báo lỗi tùy bạn
+            pass
             
     # 2. Tạo User
     hashed_password = get_password_hash(user_data.password)
@@ -147,9 +136,9 @@ async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_
         dob=parsed_dob
     )
     db.add(new_user)
-    await db.flush() # Lưu tạm vào DB để sinh ra ID
+    await db.flush() 
 
-    # Lấy dữ liệu ra ngay TRƯỚC KHI commit để tránh lỗi "MissingGreenlet" của SQLAlchemy
+    # Lấy dữ liệu ra ngay
     user_id = new_user.id
     user_email = new_user.email
     user_name = new_user.display_name
@@ -249,9 +238,8 @@ async def update_profile(
             )
         current_user.password_hash = get_password_hash(password)
 
-    # 3. 🌟 LÊN MÂY: Xử lý Upload Ảnh (Sử dụng avatar.file chuẩn)
+    # 3.Xử lý Upload Ảnh 
     if avatar:
-        # Giao trực tiếp avatar.file cho Cloudinary (giống như ta đã làm rất tốt ở Gallery)
         cloud_url = upload_image_to_cloud(avatar.file, folder_name="lovelink/avatars")
         
         if not cloud_url:
@@ -284,8 +272,6 @@ async def delete_account(
     current_user: Users = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Xóa tài khoản vĩnh viễn (Yêu cầu phải đang độc thân)"""
-    # 1. Kiểm tra trạng thái ghép đôi
     result = await db.execute(
         select(Couples).where(
             (Couples.user1_id == current_user.id) | (Couples.user2_id == current_user.id)
@@ -321,9 +307,7 @@ async def update_user_avatar(
     db: AsyncSession = Depends(get_db),
     current_user: Users = Depends(get_current_user)
 ):
-    """API riêng biệt để xử lý upload ảnh từ màn hình Onboarding"""
-    
-    # 🌟 LÊN MÂY: Xử lý Upload Ảnh Đại Diện (Onboarding)
+
     cloud_url = upload_image_to_cloud(file.file, folder_name="lovelink/avatars")
     if not cloud_url:
         raise HTTPException(status_code=400, detail="Không thể tải ảnh lên mây lúc này!")
@@ -366,12 +350,11 @@ async def update_my_email(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Lỗi khi lưu dữ liệu cập nhật Email")
     
-    # 🌟 BÍ KÍP CHỐNG F5: TẠO NGAY TOKEN MỚI CHỨA EMAIL MỚI
     new_token = create_access_token(data={"sub": str(current_user.id), "email": current_user.email})
 
     return {
         "success": True,
-        "new_token": new_token, # 👈 Ném cái vé mới về cho Frontend
+        "new_token": new_token,
         "message": "Đã cập nhật Email thành công!", 
         "user": {
             "id": str(current_user.id),

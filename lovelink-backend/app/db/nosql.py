@@ -12,13 +12,13 @@ mongodb = MongoDB()
 
 async def connect_to_mongo():
     try:
-        # 1. Khởi tạo Client
+        # Khởi tạo Client
         mongodb.client = AsyncIOMotorClient(settings.MONGODB_URL)
         
-        # 2. Khởi tạo Database (Dùng ngoặc vuông [])
+        # Khởi tạo Database
         mongodb.db = mongodb.client[settings.MONGODB_NAME]
         
-        # 3. Kích hoạt Beanie (Đảm bảo truyền mongodb.db vào chữ database)
+        # Kích hoạt Beanie 
         await init_beanie(database=mongodb.db, document_models=[Diary, Gallery, Notification,WheelData,Reminder, ChatMessage])
         
         print("✅ Đã kết nối MongoDB và khởi tạo Beanie thành công!")

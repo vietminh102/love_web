@@ -11,7 +11,7 @@ export default function UserMenu() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   
-  // 🌟 Đã xóa API_BASE_URL vì không còn cần thiết nữa
+
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPairModalOpen, setIsPairModalOpen] = useState(false);
@@ -126,14 +126,14 @@ const handleUpdateProfile = async () => {
     if (!editForm.displayName.trim()) return setUpdateError('Tên hiển thị không được để trống!');
     if (editForm.password && !editForm.oldPassword) return setUpdateError('Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu mới!');
     
-    // 🌟 BƯỚC 1: KIỂM TRA EMAIL NGAY TỪ ĐẦU (Chặn lỗi trước khi gọi API)
+    //KIỂM TRA EMAIL NGAY 
     if (editForm.email && !editForm.email.includes('@')) {
       return setUpdateError('Email phải chứa ký tự @ hợp lệ!');
     }
 
     setIsUpdating(true);
     try {
-      // 🌟 BƯỚC 2: CẬP NHẬT PROFILE CŨ
+      // CẬP NHẬT PROFILE CŨ
       const formData = new FormData();
       formData.append('display_name', editForm.displayName);
       formData.append('gender', editForm.gender);
@@ -146,7 +146,7 @@ const handleUpdateProfile = async () => {
 
       const response = await authService.updateProfile(formData);
 
-      // 🌟 BƯỚC 3: CẬP NHẬT EMAIL (Nếu người dùng có nhập và có sự thay đổi)
+      //  CẬP NHẬT EMAIL (Nếu người dùng có nhập và có sự thay đổi)
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       let finalEmail = currentUser.email;
 
@@ -160,7 +160,7 @@ const handleUpdateProfile = async () => {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // 🌟 BƯỚC 4: LƯU TẤT CẢ VÀO LOCAL STORAGE & CẬP NHẬT GIAO DIỆN
+      //  LƯU TẤT CẢ VÀO LOCAL STORAGE & CẬP NHẬT GIAO DIỆN
       setPartnerNames(prev => ({...prev, name1: editForm.displayName}));
       
       localStorage.setItem('user', JSON.stringify({ 
@@ -169,7 +169,7 @@ const handleUpdateProfile = async () => {
         avatar_url: response.user.avatar_url, 
         gender: response.user.gender, 
         dob: response.user.dob,
-        email: finalEmail // Lưu email mới vào hệ thống
+        email: finalEmail 
       }));
 
       setIsEditModalOpen(false);

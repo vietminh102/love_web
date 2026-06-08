@@ -22,9 +22,8 @@ export default function NotificationBell() {
   const token = localStorage.getItem('token');
   const navigate = useNavigate(); 
 
-  // ========================================================
-  // 🌟 KHO CHỨA BÁO THỨC TOÀN CẦU & BÁC BẢO VỆ CHẠY NGẦM
-  // ========================================================
+
+  // KHO CHỨA BÁO THỨC TOÀN CẦU & BÁC BẢO VỆ CHẠY NGẦM
   const [globalAlarms, setGlobalAlarms] = useState<any[]>([]);
   const alarmsRef = useRef(globalAlarms);
 
@@ -55,7 +54,7 @@ export default function NotificationBell() {
   useEffect(() => {
     fetchGlobalAlarms();
 
-    // 🌟 KHẮC PHỤC F5: Lắng nghe loa phát thanh từ trang tạo báo thức để nạp lại ngay lập tức
+    // Lắng nghe loa phát thanh từ trang tạo báo thức để nạp lại ngay lập tức
     window.addEventListener('reload_global_alarms', fetchGlobalAlarms);
     return () => {
       window.removeEventListener('reload_global_alarms', fetchGlobalAlarms);
@@ -72,7 +71,7 @@ export default function NotificationBell() {
           
           alarm.isTriggered = true; // Khóa chốt an toàn tránh reo lặp lại
 
-          // 🌟 TRIỆU HỒI BẢNG BÁO THỨC MÀU HỒNG TOÀN CẦU
+
           window.dispatchEvent(new CustomEvent('sync_video_event', { 
             detail: { action: 'trigger_alarm', payload: { title: alarm.title, message: alarm.message } } 
           }));
@@ -91,9 +90,8 @@ export default function NotificationBell() {
     return () => clearInterval(interval);
   }, [token]);
 
-  // ========================================================
-  // 🌟 KẾT NỐI ĐƯỜNG TRUYỀN WEBSOCKET REALTIME
-  // ========================================================
+
+  // KẾT NỐI ĐƯỜNG TRUYỀN WEBSOCKET REALTIME
   useEffect(() => {
     if (!token) return;
 
@@ -124,7 +122,7 @@ export default function NotificationBell() {
         return; 
       }
       
-      // Màng lọc 2: Rạp chiếu phim đồng bộ video
+      // Rạp chiếu phim đồng bộ video
       if (newNotif.type === 'sync_video') {
         window.dispatchEvent(new CustomEvent('sync_video_event', { detail: newNotif }));
         return; 
@@ -146,9 +144,9 @@ export default function NotificationBell() {
     };
   }, [token, VITE_API_URL]);
 
-  // ========================================================
-  // CÁC HÀM XỬ LÝ GIAO DIỆN (GIỮ NGUYÊN)
-  // ========================================================
+
+  // CÁC HÀM XỬ LÝ GIAO DIỆN
+
   const handleNotificationClick = async (notif: AppNotification) => {
     setNotifications(prev =>
       prev.map(n => (n.id === notif.id ? { ...n, is_read: true } : n))

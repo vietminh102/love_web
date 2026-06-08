@@ -15,7 +15,6 @@ class Diary(Document):
     location: Optional[str] = None
     image_url: Optional[str] = None
     
-    # Tự động lấy thời gian tạo
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     author_id: str  
@@ -23,12 +22,12 @@ class Diary(Document):
     liked_by: List[str] = []
 
     class Settings:
-        name = "diaries"  # Tên Collection trong MongoDB
+        name = "diaries"  
 
 class Gallery(Document):
     
     user_id: str
-    couple_id: Optional[str] = None # Cho phép null nếu user đang độc thân
+    couple_id: Optional[str] = None 
     image_url: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     likes: List[str] = Field(default_factory=list)
@@ -36,12 +35,12 @@ class Gallery(Document):
     class Settings:
         name = "galleries"
 class Notification(Document):
-    user_id: str          # ID của người NHẬN thông báo
-    actor_name: str       # Tên của người GÂY RA hành động (ví dụ: "Người ấy")
-    type: str             # Loại: 'like', 'diary'
-    message: str          # Nội dung: "đã thả tim ảnh của bạn", "vừa viết nhật ký mới"
-    is_read: bool = False # Đã đọc chưa?
-    link: Optional[str] = None # Link để bấm vào (ví dụ link tới bài nhật ký/ảnh)
+    user_id: str          
+    actor_name: str       
+    type: str             
+    message: str          
+    is_read: bool = False 
+    link: Optional[str] = None 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     @model_validator(mode="after")
     def ensure_utc_timezone(self):
@@ -83,7 +82,6 @@ class ChatMessage(Document):
     timestamp: int
 
     class Settings:
-        # Tên collection trong MongoDB
         name = "couple_chats"
 
 class ChatStatus(Base):
@@ -94,5 +92,5 @@ class ChatStatus(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     last_read_time = Column(BigInteger, default=0, nullable=False)  # Lưu timestamp epoch ms
 
-    # Đảm bảo mỗi user trong một couple chỉ có duy nhất một dòng trạng thái
+
     __table_args__ = (UniqueConstraint('couple_id', 'user_id', name='_couple_user_uc'),)

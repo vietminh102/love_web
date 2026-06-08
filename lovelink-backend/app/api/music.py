@@ -3,7 +3,7 @@ import yt_dlp
 import asyncio
 import urllib.parse
 
-# 🌟 Router dành riêng cho Music
+
 router = APIRouter(prefix="/couple/music", tags=["Music Station"])
 
 @router.get("/search/soundcloud")
@@ -34,7 +34,6 @@ async def search_soundcloud(q: str = Query(..., description="Từ khóa tìm ki�
 async def get_stream_url(url: str = Query(..., description="Link bài hát SoundCloud")):
     def fetch_direct_audio():
         ydl_opts = {
-            # 🌟 VŨ KHÍ MỚI: Ép buộc lấy giao thức HTTP (MP3/M4A), cấm lấy m3u8
             'format': 'bestaudio[protocol^=http]/bestaudio/best',
             'quiet': True,
             'no_warnings': True,

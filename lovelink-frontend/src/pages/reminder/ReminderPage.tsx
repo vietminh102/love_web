@@ -55,7 +55,7 @@ function ReminderPage() {
     try {
       setIsLoading(true);
       
-      // 🌟 Gọi hàm check trạng thái Email từ service vừa thêm
+
       try {
         const statusData = await reminderService.checkEmailStatus();
         setCanUseEmail(statusData.can_use_email);
@@ -88,7 +88,7 @@ function ReminderPage() {
     }
   };
 
-  // 🌟 Lấy danh sách lời nhắc ngay khi vừa mở trang
+
   useEffect(() => {
     fetchReminders();
   }, []);
@@ -111,7 +111,7 @@ function ReminderPage() {
 
       await fetchReminders();
       
-      // 🌟 PHÁT LOA BÁO CHO "BÁC BẢO VỆ" Ở NAVBAR BIẾT CÓ BÁO THỨC MỚI ĐỂ CẬP NHẬT
+
       window.dispatchEvent(new Event('reload_global_alarms'));
 
       // Reset form

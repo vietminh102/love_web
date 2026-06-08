@@ -32,7 +32,7 @@ const RecenterMap = ({ coords }: { coords: [number, number] | null }) => {
 };
 
 export const LiveLocation = () => {
-  // 🌟 NÂNG CẤP: Khởi tạo tất cả trạng thái từ localStorage để chống mất dữ liệu khi F5
+
   const [myCoords, setMyCoords] = useState<[number, number] | null>(() => {
     const saved = localStorage.getItem('myLastCoords');
     return saved ? JSON.parse(saved) : null;
@@ -202,7 +202,7 @@ export const LiveLocation = () => {
           }
         }
       }
-      // 🌟 MỚI: Nếu nhận được tín hiệu đối phương dừng chia sẻ, xóa vị trí của họ trên màn hình của mình
+      // Nếu nhận được tín hiệu đối phương dừng chia sẻ, xóa vị trí của họ trên màn hình của mình
       else if (action === 'stop_sharing') {
         setPartnerCoords(null);
         setPartnerStationarySince(null);

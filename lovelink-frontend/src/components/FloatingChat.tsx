@@ -88,7 +88,7 @@ export const FloatingChat = () => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 🌟 4. HÀM ĐÓNG / MỞ ĐƯỢC BỌC THÉP
+  // HÀM ĐÓNG / MỞ ĐƯỢC BỌC THÉP
   const toggleChat = () => {
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);
