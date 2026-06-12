@@ -1,11 +1,55 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Heart, Sparkles, BellRing, Clock, Plus, 
-  ListTodo, Type, MessageSquare, Mail, Trash2, CheckCircle2 
+  ListTodo, Type, MessageSquare, Mail, Trash2, CheckCircle2,
+  CalendarPlus // 🌟 Thêm icon Calendar
 } from 'lucide-react';
 import { reminderService } from '../../services/reminderService'; 
 
-// Cấu hình kiểu dữ liệu cho Trái tim bay để không bị lỗi giật lag giao diện
+// ==========================================
+// 🌟 HÀM TIỆN ÍCH TẠO FILE BÁO THỨC (.ICS)
+// ==========================================
+const formatDateForICS = (date: Date) => {
+  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+};
+
+const downloadReminderICS = (title: string, date: Date, description: string = '') => {
+  const startDate = formatDateForICS(date);
+  const endDateObj = new Date(date.getTime() + 15 * 60000); // Kéo dài 15 phút
+  const endDate = formatDateForICS(endDateObj);
+  const uid = Date.now().toString() + "@lovelink.com";
+
+  const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//LoveLink//Trạm Tình Yêu//VI
+BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${startDate}
+DTSTART:${startDate}
+DTEND:${endDate}
+SUMMARY:${title}
+DESCRIPTION:${description}
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:${title}
+TRIGGER:-PT0M
+END:VALARM
+END:VEVENT
+END:VCALENDAR`;
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `LoveLink_NhacNho_${Date.now()}.ics`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+// ==========================================
+
+
 interface HeartConfig {
   id: string;
   left: string;
@@ -34,7 +78,6 @@ function ReminderPage() {
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Khóa vị trí ngẫu nhiên của các trái tim nền để giao diện không bị chớp giật khi gõ phím
   const randomHearts = useMemo<HeartConfig[]>(() => {
     return [...Array(6)].map((_, i) => ({
       id: `floating-heart-${i}`,
@@ -54,13 +97,9 @@ function ReminderPage() {
   const fetchReminders = async () => {
     try {
       setIsLoading(true);
-      
-
       try {
         const statusData = await reminderService.checkEmailStatus();
         setCanUseEmail(statusData.can_use_email);
-        
-        // Nếu không được phép dùng mail, tự động gạt nút về Tắt
         if (!statusData.can_use_email) {
           setSendEmail(false);
         }
@@ -68,7 +107,6 @@ function ReminderPage() {
         console.error("Lỗi khi kiểm tra quyền sử dụng Email:", e);
       }
 
-      // Logic tải danh sách lời nhắc cũ giữ nguyên
       const data = await reminderService.getReminders();
       if (Array.isArray(data)) {
         const formattedData = data.map((item: any, index: number) => ({
@@ -88,19 +126,16 @@ function ReminderPage() {
     }
   };
 
-
   useEffect(() => {
     fetchReminders();
   }, []);
 
   const handleSaveReminder = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (new Date(remindTime) <= new Date()) {
       alert("Thời gian báo thức phải lớn hơn hiện tại nhé bé! 💕");
       return;
     }
-
     try {
       await reminderService.createReminder({
         title,
@@ -110,11 +145,8 @@ function ReminderPage() {
       });
 
       await fetchReminders();
-      
-
       window.dispatchEvent(new Event('reload_global_alarms'));
 
-      // Reset form
       setTitle(''); setMessage(''); setRemindTime(''); setSendEmail(true);
       setActiveTab('list');
       alert("Đã thêm lời nhắc thành công! ⏰");
@@ -139,7 +171,6 @@ function ReminderPage() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-linear-to-br from-pink-100 via-purple-100 to-red-100 relative overflow-hidden">
       
-      {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         {randomHearts.map((heart) => (
           <Heart
@@ -163,7 +194,6 @@ function ReminderPage() {
       </div>
 
       <div className="w-full max-w-lg px-6 relative z-10 py-12 h-full flex flex-col">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-linear-to-br from-pink-400 via-rose-400 to-red-500 rounded-full mb-4 shadow-2xl animate-pulse">
             <BellRing className="w-10 h-10 text-white animate-[wiggle_1s_ease-in-out_infinite]" />
@@ -173,7 +203,6 @@ function ReminderPage() {
           </h1>
         </div>
 
-        {/* Khung chính */}
         <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/50 flex-1 overflow-hidden flex flex-col max-h-[70vh]">
           
           <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl shrink-0">
@@ -185,7 +214,6 @@ function ReminderPage() {
             </button>
           </div>
 
-          {/* TAB 1: DANH SÁCH LỜI NHẮC */}
           {activeTab === 'list' && (
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
               {isLoading ? (
@@ -207,7 +235,7 @@ function ReminderPage() {
                     
                     <p className={`text-sm mb-3 ${item.isTriggered ? 'text-gray-400' : 'text-gray-600'}`}>{item.message}</p>
                     
-                    <div className="flex items-center gap-4 text-xs font-semibold">
+                    <div className="flex items-center gap-4 text-xs font-semibold mb-1">
                       {item.isTriggered ? (
                         <span className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-full shadow-sm text-green-500">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Đã xong
@@ -225,13 +253,25 @@ function ReminderPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* 🌟 NÚT BẬT BÁO THỨC ĐIỆN THOẠI (Chỉ hiện khi chưa tới giờ kêu) */}
+                    {!item.isTriggered && (
+                      <div className="mt-3 border-t border-pink-100/50 pt-3">
+                        <button 
+                          onClick={() => downloadReminderICS(item.title, new Date(item.time), item.message)}
+                          className="w-full flex items-center justify-center gap-2 bg-white hover:bg-rose-50 text-rose-500 border border-rose-100 px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-xs"
+                        >
+                          <CalendarPlus className="w-4 h-4" />
+                          Thêm vào báo thức điện thoại
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
             </div>
           )}
 
-          {/* TAB 2: FORM TẠO LỜI NHẮC */}
           {activeTab === 'create' && (
             <form onSubmit={handleSaveReminder} className="space-y-5 overflow-y-auto pr-2 custom-scrollbar flex-1">
               <div>
@@ -277,10 +317,9 @@ function ReminderPage() {
                     </div>
                   </div>
                   
-                  {/* Nút Gạt */}
                   <button 
                     type="button" 
-                    disabled={!canUseEmail} // 🛑 KHÓA NÚT NẾU KHÔNG CÓ EMAIL
+                    disabled={!canUseEmail}
                     onClick={() => setSendEmail(!sendEmail)} 
                     className={`relative w-12 h-6 rounded-full transition-colors duration-300 ease-in-out shrink-0 ${canUseEmail && sendEmail ? 'bg-pink-500' : 'bg-gray-300'} ${!canUseEmail ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   >
@@ -288,7 +327,6 @@ function ReminderPage() {
                   </button>
                 </div>
                 
-                {/* 🚨 HIỂN THỊ DÒNG CHỮ CẢNH BÁO MÀU ĐỎ NẾU CHƯA CÓ EMAIL */}
                 {!canUseEmail && (
                   <p className="text-red-500 text-xs italic font-medium px-2 animate-pulse">
                     * Bạn hoặc người ấy chưa có Email (chứa dấu @) trong hồ sơ. Hãy vào mục Cá nhân để cập nhật nhé!
