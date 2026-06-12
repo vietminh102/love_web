@@ -6,17 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ==========================================
-# 🌟 HÀM NẶN FILE BÁO THỨC (.ICS)
-# ==========================================
 def generate_ics_content(title: str, description: str, remind_time: datetime) -> str:
-    # Chuyển đổi thời gian sang chuẩn iCalendar (UTC format: YYYYMMDDThhmmssZ)
     start_time_str = remind_time.strftime('%Y%m%dT%H%M%SZ')
-    
-    # Cộng thêm 15 phút cho sự kiện
     end_time = remind_time + timedelta(minutes=15)
     end_time_str = end_time.strftime('%Y%m%dT%H%M%SZ')
-    
     uid = f"{int(datetime.now().timestamp())}@lovelink.com"
 
     return f"""BEGIN:VCALENDAR
@@ -37,67 +30,64 @@ END:VALARM
 END:VEVENT
 END:VCALENDAR"""
 
-# ==========================================
-# 🌟 HÀM GỬI EMAIL (ĐÃ TÍCH HỢP ĐÍNH KÈM)
-# ==========================================
-# Lưu ý: Nhớ thêm tham số remind_time vào hàm nhé!
-async def send_reminder_email(to_email: str, title: str, message_content: str, remind_time: datetime):
+# 🌟 Đã gán remind_time = None để tự động phân biệt
+async def send_reminder_email(to_email: str, title: str, message_content: str, remind_time: datetime = None):
     BREVO_API_KEY = os.getenv("BREVO_API_KEY")
     SENDER_EMAIL = "thongbaolovee@gmail.com" 
-
     url = "https://api.brevo.com/v3/smtp/email"
-    
     headers = {
         "accept": "application/json",
         "api-key": BREVO_API_KEY,
         "content-type": "application/json"
     }
-    
-    # 1. Tạo nội dung file báo thức
-    ics_text = generate_ics_content(title, message_content, remind_time)
-    
-    # 2. Mã hóa sang Base64 theo đúng chuẩn yêu cầu của Brevo API
-    ics_base64 = base64.b64encode(ics_text.encode('utf-8')).decode('utf-8')
 
-    html_content = f"""
-    <html>
-        <body style="font-family: Arial, sans-serif; background-color: #fdf2f8; padding: 20px;">
-            <div style="max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <h1 style="color: #ec4899;">⏰ Đến giờ rồi bé ơi!</h1>
-                <h2 style="color: #1f2937;">{title}</h2>
-                <p style="font-size: 16px; color: #4b5563; padding: 15px; background: #fce7f3; border-radius: 10px;">
-                    "{message_content}"
-                </p>
-                <p style="color: #ec4899; font-weight: bold; font-size: 14px; margin-top: 20px;">
-                    👇 Bấm vào file đính kèm bên dưới để bật chuông báo thức nhé!
-                </p>
-                <p style="color: #9ca3af; font-size: 12px; margin-top: 10px;">
-                    Vào web ngay để xem chi tiết nha ❤️
-                </p>
-            </div>
-        </body>
-    </html>
-    """
+    # ===============================================
+    # TRƯỜNG HỢP 1: GỬI LÚC VỪA TẠO (ĐÍNH KÈM LỊCH)
+    # ===============================================
+    if remind_time:
+        ics_text = generate_ics_content(title, message_content, remind_time)
+        ics_base64 = base64.b64encode(ics_text.encode('utf-8')).decode('utf-8')
+        
+        html_content = f"""
+        <div style="font-family: Arial; padding: 20px; text-align: center;">
+            <h2 style="color: #ec4899;">📅 Bạn có 1 lịch hẹn mới!</h2>
+            <h3>{title}</h3>
+            <p>"{message_content}"</p>
+            <p style="color: #ec4899; font-weight: bold;">👇 Bấm vào file đính kèm để bật chuông điện thoại nhé!</p>
+        </div>"""
+        
+        payload = {
+            "sender": {"name": "Trạm Tình Yêu", "email": SENDER_EMAIL},
+            "to": [{"email": to_email}],
+            "subject": f"📅 Lịch hẹn: {title}",
+            "htmlContent": html_content,
+            "attachment": [{"content": ics_base64, "name": "LoveLink_BaoThuc.ics"}]
+        }
 
-    # 3. Đóng gói bức thư (Thêm key "attachment" vào payload)
-    payload = {
-        "sender": {"name": "Nhắc Nhở Tình Yêu", "email": SENDER_EMAIL},
-        "to": [{"email": to_email}],
-        "subject": f"⏰ Báo thức: {title}",
-        "htmlContent": html_content,
-        "attachment": [
-            {
-                "content": ics_base64,
-                "name": "LoveLink_BaoThuc.ics" # Tên file sẽ hiển thị trong Gmail
-            }
-        ]
-    }
+    # ===============================================
+    # TRƯỜNG HỢP 2: GỬI LÚC CHUÔNG KÊU (BÁO ĐỘNG)
+    # ===============================================
+    else:
+        html_content = f"""
+        <div style="font-family: Arial; padding: 20px; text-align: center; background: #fce7f3; border-radius: 15px;">
+            <h1 style="color: #e11d48; font-size: 30px;">⏰ BÍP BÍP BÍP!</h1>
+            <h2 style="color: #1f2937;">{title}</h2>
+            <p style="font-size: 18px; padding: 15px;">"{message_content}"</p>
+            <p style="color: #9ca3af;">Đến giờ rồi, vào web ngay nhé ❤️</p>
+        </div>"""
+        
+        payload = {
+            "sender": {"name": "Báo Thức Tình Yêu", "email": SENDER_EMAIL},
+            "to": [{"email": to_email}],
+            "subject": f"🚨 TING TING: {title}",
+            "htmlContent": html_content
+        }
 
+    # Bắn API Brevo
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status() 
-            print(f"✅ Đã gửi Email kèm File Báo Thức thành công tới: {to_email}")
-            
+            print(f"✅ Đã gửi Email ({'KÈM FILE LỊCH' if remind_time else 'BÁO ĐỘNG CHUÔNG'}) tới: {to_email}")
     except Exception as e:
-        print(f"❌ Lỗi khi gửi email qua API Brevo: {e}")
+        print(f"❌ Lỗi khi gửi email: {e}")
