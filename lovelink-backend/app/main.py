@@ -134,5 +134,11 @@ app.include_router(reminder.router)
 @app.get("/")
 async def root():
     return {"message": "Welcome to Lovelink API!"}
-
+@app.get("/ping", tags=["Health Check"])
+async def keep_alive():
+    return {
+        "status": "Alive", 
+        "message": "Trạm tình yêu vẫn đang thức!", 
+        "time": datetime.now().isoformat()
+    }
 # uvicorn app.main:app --reload

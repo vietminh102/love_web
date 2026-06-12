@@ -15,6 +15,7 @@ import { MusicProvider } from './contexts/MusicContext';
 import ReminderPage from './pages/reminder/ReminderPage'; 
 import { GlobalDrawer } from './components/GlobalDrawer';
 import { AlarmOverlay } from './components/AlarmOverlay';
+import { LoadingScreen } from './components/LoadingScreen';
 import { Navbar } from './components/Navbar';
 import { FloatingChat } from './components/FloatingChat';
 
@@ -23,11 +24,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth(); 
   
   if (isLoading) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center bg-pink-50">
-        <div className="w-10 h-10 border-4 border-pink-300 border-t-rose-500 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
   
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
