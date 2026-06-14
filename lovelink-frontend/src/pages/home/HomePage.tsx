@@ -1,12 +1,44 @@
+// Đường dẫn file: src/pages/home/HomePage.tsx
 import { Heart, Sparkles, Calendar, Camera, Trash2 } from 'lucide-react';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { coupleService } from '../../services/coupleService';
+import { motion, AnimatePresence } from 'motion/react';
+
+// --- CẤU HÌNH DỮ LIỆU HIỆU ỨNG NỔ ---
+const LOVE_MESSAGES = [
+  "Em là ánh sáng trong cuộc đời anh 🌟",
+  "Anh yêu em mãi mãi 💕",
+  "Em làm trái tim anh rung động ❤️",
+  "Cùng em, anh có thể vượt qua mọi thứ 🌹",
+  "Em là điều kỳ diệu nhất anh từng gặp ✨",
+  "Nụ cười của em làm anh tan chảy 😍",
+  "Anh muốn nắm tay em đến cuối cuộc đời 💑",
+  "Em là giấc mơ đẹp nhất của anh 🌙",
+  "Yêu em hơn tất cả những vì sao 🌠",
+  "Em là lý do anh mỉm cười mỗi sáng ☀️",
+  "Trái tim anh chỉ đập vì em 💓",
+  "Em là bài thơ đẹp nhất anh được đọc 📖",
+  "Cùng em, mọi ngày đều là thiên đường 🌸",
+  "Anh không thể tưởng tượng cuộc sống không có em 🥺",
+  "Em đẹp hơn cả trăng sao 🌟",
+  "Love you to the moon and back 🚀🌕",
+  "Em là tất cả của anh 💝",
+  "Mãi yêu em, em ơi! 🫶",
+  "Em là hạnh phúc lớn nhất của anh 🎊",
+  "Anh yêu cái cách em cười 😊",
+];
+
+const PARTICLE_EMOJIS = ["🩷", "💕", "💖", "💗", "💓", "💝", "🌸", "✨", "🎀", "⭐", "💫", "🍭"];
+const TEXT_COLORS = ["#ff6b9d", "#ff85a1", "#ff4d8b", "#e91e8c", "#ff9eb5", "#ffb3c6", "#fc8eac", "#ff69b4"];
+
+interface Particle { id: number; x: number; y: number; vx: number; vy: number; size: number; emoji: string; }
+interface FloatingText { id: number; text: string; x: number; duration: number; size: number; color: string; }
 
 export default function HomePage() {
   const { user } = useAuth();
   
-  // --- STATES CHO GIAO DIỆN CHÍNH ---
+  // --- STATES GIAO DIỆN GỐC CỦA BẠN ---
   const [partnerDob, setPartnerDob] = useState<string>('');
   const [partnerGender, setPartnerGender] = useState<string>('other');
   const [hasPartner, setHasPartner] = useState(false);
@@ -18,32 +50,32 @@ export default function HomePage() {
   const [isEditingDate, setIsEditingDate] = useState(false);
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   
-  // Backgroud
   const [bgImage, setBgImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [partnerNames, setPartnerNames] = useState({ 
     name1: user?.display_name || 'Bạn', 
     name2: 'Đang tải...'
   });
+
+  // --- STATES LOGIC NỔ TRÁI TIM ---
+  const [phase, setPhase] = useState<"idle" | "beating" | "exploding" | "messages">("idle");
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const [floatingTexts, setFloatingTexts] = useState<FloatingText[]>([]);
+  const [heartScale, setHeartScale] = useState(1);
+
+  const textIdRef = useRef(0);
+  const animFrameRef = useRef<number>(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const particleActive = useRef(false);
+
   const getFullImageUrl = (url: string | null) => {
     if (!url) return '';
-    // 1. Dành cho ảnh nháp lúc vừa bấm chọn (blob:...)
     if (url.startsWith('blob:')) return url;
-    
-    // 2. Dọn rác DB cũ: Phát hiện chữ localhost thì tự động chặt đi thay bằng link Vercel
-    if (url.includes('localhost:8000')) {
-      return url.replace('http://localhost:8000', API_BASE_URL);
-    }
-    
-    // 3. Dành cho chuẩn mới: Cộng link Render vào trước đuôi /static/...
+    if (url.includes('localhost:8000')) return url.replace('http://localhost:8000', API_BASE_URL);
     if (url.startsWith('/')) return `${API_BASE_URL}${url}`;
-    
     return url;
   };
 
-  // --- ĐÃ XÓA USE_EFFECT LOCALSTORAGE CŨ BỊ XUNG ĐỘT Ở ĐÂY ---
-
-  // Lấy thông tin đối phương từ API (Đã gộp xử lý background vào đây)
   useEffect(() => {
     if (!user) return;
     const fetchPartner = async () => {
@@ -57,12 +89,8 @@ export default function HomePage() {
           if (data.gender) setPartnerGender(data.gender);
           if (data.avatar_url) setPartnerAvatar(data.avatar_url);
           
-          // SỬA LOGIC Ở ĐÂY: Ưu tiên dùng ảnh nền từ Database trả về
-          if (data.background_url) {
-            setBgImage(data.background_url);
-          } else {
-            setBgImage(null); // Nếu DB không có ảnh thì set về null
-          }
+          if (data.background_url) setBgImage(data.background_url);
+          else setBgImage(null);
 
           if (data.start_date) {
             setStartDateDB(data.start_date);
@@ -73,7 +101,7 @@ export default function HomePage() {
           }
         } else {
           setPartnerNames(prev => ({ ...prev, name2: '(Chưa ghép đôi)' }));
-          setBgImage(null); // SỬA LOGIC Ở ĐÂY: Nếu độc thân thì xóa sạch ảnh nền
+          setBgImage(null); 
         }
       } catch (error) {
         console.error("Lỗi khi tải thông tin đối phương:", error);
@@ -83,15 +111,12 @@ export default function HomePage() {
     fetchPartner();
   }, [user]);
 
-  // Đồng hồ đếm thời gian yêu nhau
   useEffect(() => {
     if (!hasPartner || !startDateDB) return;
-
     const calculateTime = () => {
       const start = new Date(startDateDB).getTime();
       const now = new Date().getTime();
       const diffTime = Math.max(0, now - start);
-
       setLoveTime({
         days: Math.floor(diffTime / (1000 * 60 * 60 * 24)),
         hours: Math.floor((diffTime / (1000 * 60 * 60)) % 24),
@@ -99,56 +124,41 @@ export default function HomePage() {
         seconds: Math.floor((diffTime / 1000) % 60)
       });
     };
-
     calculateTime();
     const timer = setInterval(calculateTime, 1000);
     return () => clearInterval(timer);
   }, [hasPartner, startDateDB]);
 
-  // Xử lý upload ảnh
   const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && hasPartner) {
       try {
-        // MẸO UX: Cho hiển thị tạm ảnh lên màn hình ngay lập tức để cảm giác mượt mà
         const tempUrl = URL.createObjectURL(file);
         setBgImage(tempUrl); 
-        
-        // GỌI API GỬI FILE LÊN MONGODB/POSTGRESQL
         const res = await coupleService.uploadBackground(file);
-        
-        // Thành công thì dùng ảnh xịn từ server
         setBgImage(res.background_url); 
       } catch (error) {
-        console.error("Lỗi up ảnh nền", error);
         alert("Có lỗi xảy ra khi tải ảnh lên!");
-        setBgImage(null); // Nếu lỗi thì gỡ ảnh tạm đi
+        setBgImage(null); 
       }
     }
   };
 
-  // Xóa ảnh nền
   const handleRemoveBg = async () => {
     if (!hasPartner) return;
-    
-    // Cảnh báo người dùng trước khi xóa vì sẽ ảnh hưởng tới cả 2 người
     if (!window.confirm("Bạn có chắc chắn muốn xóa ảnh nền của cả hai không?")) return;
-
     try {
       await coupleService.removeBackground();
-      setBgImage(null); // Xóa trên màn hình
+      setBgImage(null); 
     } catch (error) {
-      console.error("Lỗi xóa ảnh", error);
       alert("Không thể xóa ảnh nền lúc này.");
     }
   };
   
-  // Lưu ngày bắt đầu yêu
   const handleSaveDate = async () => {
     try {
       const localDate = new Date(editDateInput);
       const res = await coupleService.updateStartDate(localDate.toISOString());
-      
       setStartDateDB(res.new_start_date);
       setIsEditingDate(false);
       alert("Đã cập nhật thời gian thành công! 💕");
@@ -157,28 +167,107 @@ export default function HomePage() {
     }
   };
 
-  // Tính tuổi
   const getAge = (dobStr?: string) => {
     if (!dobStr) return ''; 
     const birthDate = new Date(dobStr);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return `(${age})`; 
   };
 
-  // Danh xưng
   const getRoleName = (gender?: string) => {
     if (gender === 'male') return 'Chồng ';
     if (gender === 'female') return 'Vợ ';
     return ''; 
   };
 
+  // --- LOGIC XỬ LÝ HẠT NỔ TUNG ---
+  const spawnFloatingText = useCallback(() => {
+    const id = textIdRef.current++;
+    const msg = LOVE_MESSAGES[id % LOVE_MESSAGES.length];
+    const newText: FloatingText = {
+      id, text: msg, x: Math.random() * 72 + 4,
+      duration: 5 + Math.random() * 4,
+      size: 0.85 + Math.random() * 0.55,
+      color: TEXT_COLORS[Math.floor(Math.random() * TEXT_COLORS.length)],
+    };
+    setFloatingTexts(prev => [...prev.slice(-30), newText]);
+  }, []);
+
+  const explodeHeart = useCallback(() => {
+    setPhase("exploding");
+    const newParticles: Particle[] = Array.from({ length: 95 }, (_, i) => {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 4 + Math.random() * 12;
+      return {
+        id: i, x: 50, y: 42, // Bắn ra từ tọa độ tâm của Trái tim trên màn hình
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 3,
+        size: 16 + Math.random() * 24,
+        emoji: PARTICLE_EMOJIS[Math.floor(Math.random() * PARTICLE_EMOJIS.length)],
+      };
+    });
+    setParticles(newParticles);
+    particleActive.current = true;
+    setTimeout(() => {
+      setPhase("messages");
+      spawnFloatingText();
+    }, 800);
+  }, [spawnFloatingText]);
+
+  const startBeating = useCallback(() => {
+    if (phase !== "idle") return; 
+    setPhase("beating");
+    let count = 0;
+    const beat = () => {
+      setHeartScale(s => (s === 1 ? 1.22 : 1)); 
+      count++;
+      if (count >= 6) {
+        clearInterval(intervalRef.current!);
+        setTimeout(explodeHeart, 150);
+      }
+    };
+    intervalRef.current = setInterval(beat, 250);
+  }, [phase, explodeHeart]);
+
+  useEffect(() => {
+    if (phase === "messages") {
+      const id = setInterval(spawnFloatingText, 700);
+      return () => clearInterval(id);
+    }
+  }, [phase, spawnFloatingText]);
+
+  useEffect(() => {
+    if (!particleActive.current || particles.length === 0) return;
+    const animate = () => {
+      setParticles(prev => {
+        const next = prev.map(p => ({
+          ...p, x: p.x + p.vx * 0.85, y: p.y + p.vy * 0.85, vy: p.vy + 0.16, vx: p.vx * 0.97,
+        })).filter(p => p.y < 115 && p.x > -10 && p.x < 110);
+        if (next.length === 0) particleActive.current = false;
+        return next;
+      });
+      if (particleActive.current) animFrameRef.current = requestAnimationFrame(animate);
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [particles.length]);
+
+  const resetAnimation = () => {
+    setPhase("idle");
+    setParticles([]);
+    setFloatingTexts([]);
+    setHeartScale(1);
+    particleActive.current = false;
+    textIdRef.current = 0;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    cancelAnimationFrame(animFrameRef.current);
+  };
+
   return (
-    <div className="min-h-screen w-full  via-rose-200 to-red-200 relative overflow-hidden font-sans">
+    <div className="min-h-screen w-full via-rose-200 to-red-200 relative overflow-hidden font-sans">
       <div 
         className="absolute inset-0 z-0 transition-all duration-700 bg-cover bg-center bg-no-repeat bg-pink-100"
         style={(bgImage && hasPartner) ? { backgroundImage: `url('${getFullImageUrl(bgImage)}')` } : {}}
@@ -191,7 +280,8 @@ export default function HomePage() {
       {(bgImage && hasPartner) && (
         <div className="absolute inset-0 z-0 bg-pink-950/20 backdrop-blur-[2px]" />
       )}
-      {/* Animated Background Particles */}
+      
+      {/* Background Particles gốc */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(20)].map((_, i) => (
           <div key={i} className="absolute animate-float" style={{
@@ -204,6 +294,7 @@ export default function HomePage() {
           </div>
         ))}
       </div>
+
       {hasPartner && (
         <div className="fixed bottom-32 right-6 z-50 flex flex-col gap-3">
           {bgImage && (
@@ -222,94 +313,55 @@ export default function HomePage() {
           >
             <Camera className="w-5 h-5" />
           </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/*" 
-            onChange={handleBgUpload} 
-          />
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleBgUpload} />
         </div>
       )}
       
       <div className="relative z-10 flex flex-col items-center gap-8 px-6 pt-15 pb-24 w-full h-full overflow-y-auto">
         
-
+        {/* Khối Thông tin Avatars giữ nguyên */}
         <div className="w-full text-center mt-6 mb-4 z-10 relative px-1">
           <div className="flex flex-row items-start justify-center gap-2 sm:gap-6 flex-nowrap max-w-2xl mx-auto">
-            
-            {/* Cột 1: Người dùng (Bạn) */}
             <div className="flex flex-col items-center flex-1 min-w-0">
               <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-[3px] border-white/90 shadow-lg overflow-hidden bg-pink-100 flex items-center justify-center shrink-0">
-            
                 <img 
                   src={(user as any)?.avatar_url ? getFullImageUrl((user as any).avatar_url) : `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name1)}&background=fbcfe8&color=be185d&size=150`}
                   className="w-full h-full object-cover" 
                 />
               </div>
               <div className="mt-2 sm:mt-3 flex flex-col items-center w-full">
-                
-                <span className="text-xs sm:text-sm text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {getRoleName(user?.gender)}
-                </span>
-                
-                {/* Tên bản thân */}
-                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {partnerNames.name1}
-                </span>
-                
-                {/* Tuổi bản thân */}
-                <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {getAge(user?.dob)}
-                </span>
+                <span className="text-xs sm:text-sm text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{getRoleName(user?.gender)}</span>
+                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{partnerNames.name1}</span>
+                <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{getAge(user?.dob)}</span>
               </div>
             </div>
 
-            {/* Cột 2: Trái tim nhấp nháy ở giữa */}
             <div className="shrink-0 animate-pulse drop-shadow-md mt-4 sm:mt-8 px-2">
               <span className="text-4xl sm:text-6xl text-rose-500 animate-pulse drop-shadow-md mx-1">💕</span>
             </div>
 
-            {/* Cột 3: Đối phương (Người ấy) */}
             <div className="flex flex-col items-center flex-1 min-w-0">
               <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full border-[3px] border-white/90 shadow-lg overflow-hidden bg-pink-100 flex items-center justify-center shrink-0">
                 {hasPartner ? (
-                   <img 
-                     src={partnerAvatar ? getFullImageUrl(partnerAvatar) : `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name2)}&background=ffe4e6&color=e11d48&size=150`} 
-                     alt="Partner Avatar"
-                     className="w-full h-full object-cover" 
-                   />
-                ) : (
-                   <span className="text-pink-400 text-2xl sm:text-3xl font-bold">?</span>
-                )}
+                   <img src={partnerAvatar ? getFullImageUrl(partnerAvatar) : `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerNames.name2)}&background=ffe4e6&color=e11d48&size=150`} 
+                     alt="Partner Avatar" className="w-full h-full object-cover" />
+                ) : ( <span className="text-pink-400 text-2xl sm:text-3xl font-bold">?</span> )}
               </div>
               <div className="mt-2 sm:mt-3 flex flex-col items-center w-full">
-                
-                {hasPartner && (
-                  <span className="text-xs sm:text-sm text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                    {getRoleName(partnerGender)}
-                  </span>
-                )}
-                
-                {/* Tên chính */}
-                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {hasPartner ? partnerNames.name2 : "Đang tìm..."}
-                </span>
-                
-                {/* Tuổi */}
-                <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
-                  {hasPartner ? getAge(partnerDob) : ""}
-                </span>
+                {hasPartner && <span className="text-xs sm:text-sm text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{getRoleName(partnerGender)}</span>}
+                <span className="font-bold text-pink-600 text-sm sm:text-xl truncate w-full px-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{hasPartner ? partnerNames.name2 : "Đang tìm..."}</span>
+                <span className="text-[11px] sm:text-base text-pink-500 font-semibold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{hasPartner ? getAge(partnerDob) : ""}</span>
               </div>
             </div>
-
           </div>
         </div>
-        {/* ======================================================== */}
 
-        {/* Big Heart Container */}
-        <div className="relative my-8">
+        {/* ======================================================== */}
+        {/* KHU VỰC CHỨA KHUNG TRÁI TIM NỔ TUNG */}
+        {/* ======================================================== */}
+        <div className="relative my-8 w-95 h-95 sm:w-125 sm:h-125 flex items-center justify-center">
           
+          {/* Vòng tròn sóng âm lan tỏa giữ nguyên */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-95 h-95 sm:w-125 sm:h-125 border-4 border-pink-300 rounded-full opacity-20 animate-ping" style={{ animationDuration: '3s' }} />
           </div>
@@ -317,90 +369,118 @@ export default function HomePage() {
             <div className="w-82.5 h-82.5 sm:w-107.5 sm:h-107.5 border-4 border-rose-300 rounded-full opacity-30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
           </div>
 
-          <div className="relative w-95 h-95 sm:w-125 sm:h-125 flex items-center justify-center">
-            
-            <svg viewBox="0 0 24 24" className="absolute w-full h-full text-pink-500 fill-pink-500 opacity-90 animate-heartbeat drop-shadow-2xl">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-            
-            <svg viewBox="0 0 24 24" className="absolute w-[90%] h-[90%] animate-pulse" style={{ animationDuration: '2s' }}>
-              <defs>
-                <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#f472b6" /><stop offset="50%" stopColor="#fb7185" /><stop offset="100%" stopColor="#f43f5e" />
-                </linearGradient>
-              </defs>
-              <path fill="url(#heartGradient)" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
+          <AnimatePresence mode="wait">
+            {/* LỚP 1: TRÁI TIM GỐC (Chỉ hiển thị khi bình thường hoặc đang đập nhấp nháy) */}
+            {(phase === "idle" || phase === "beating") && (
+              <motion.div 
+                key="original-love-heart"
+                className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                onClick={startBeating}
+                animate={{ scale: heartScale }}
+                // 🔥 ĐÂY CHÍNH LÀ HIỆU ỨNG NỔ: Phóng to gấp 3 lần, mờ dần và nhòe đi trong 0.35 giây
+                exit={{ 
+                  scale: 3.2, 
+                  opacity: 0, 
+                  filter: "blur(12px)",
+                  transition: { duration: 0.35, ease: "easeOut" } 
+                }}
+                whileHover={phase === "idle" ? { scale: 1.05 } : {}}
+                transition={{ scale: { type: "spring", stiffness: 260, damping: 12 } }}
+                title="Chạm vào tim để kích hoạt điều bất ngờ 💕"
+              >
+                {/* SVG Trái tim gốc của bạn */}
+                <svg viewBox="0 0 24 24" className="absolute w-full h-full text-pink-500 fill-pink-500 opacity-90 animate-heartbeat drop-shadow-2xl">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+                <svg viewBox="0 0 24 24" className="absolute w-[90%] h-[90%] animate-pulse" style={{ animationDuration: '2s' }}>
+                  <defs>
+                    <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#f472b6" /><stop offset="50%" stopColor="#fb7185" /><stop offset="100%" stopColor="#f43f5e" />
+                    </linearGradient>
+                  </defs>
+                  <path fill="url(#heartGradient)" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
 
-            {/* Days Counter Inside Heart */}
-            {hasPartner ? (
-              <div className="relative z-10 flex flex-col items-center justify-center -mt-8 sm:-mt-12">
-                <span className="text-pink-100 text-sm font-medium tracking-widest uppercase mb-1 drop-shadow-md">
-                  Đã bên nhau
-                </span>
-                
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-7xl sm:text-8xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] tracking-tighter">
-                    {loveTime.days}
-                  </span>
-                  <span className="text-xl sm:text-2xl font-bold text-white/90 drop-shadow-md mb-2">
-                    ngày
-                  </span>
-                </div>
+                {/* Chữ số đếm ngày gốc của bạn */}
+                {hasPartner ? (
+                  <div className="relative z-10 flex flex-col items-center justify-center -mt-8 sm:-mt-12 select-none">
+                    <span className="text-pink-100 text-sm font-medium tracking-widest uppercase mb-1 drop-shadow-md">Đã bên nhau</span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-7xl sm:text-8xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] tracking-tighter">{loveTime.days}</span>
+                      <span className="text-xl sm:text-2xl font-bold text-white/90 drop-shadow-md mb-2">ngày</span>
+                    </div>
+                    <div className="mt-2 sm:mt-4 flex items-center justify-center gap-2 sm:gap-3 bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
+                      <div className="flex flex-col items-center w-10">
+                        <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.hours.toString().padStart(2, '0')}</span>
+                        <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Giờ</span>
+                      </div>
+                      <span className="text-xl font-bold text-pink-200 animate-pulse pb-4">:</span>
+                      <div className="flex flex-col items-center w-10">
+                        <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.minutes.toString().padStart(2, '0')}</span>
+                        <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Phút</span>
+                      </div>
+                      <span className="text-xl font-bold text-pink-200 animate-pulse pb-4">:</span>
+                      <div className="flex flex-col items-center w-10">
+                        <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.seconds.toString().padStart(2, '0')}</span>
+                        <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Giây</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative z-10 text-center flex flex-col items-center -mt-6 select-none">
+                    <div className="text-6xl sm:text-8xl font-black text-white/40 drop-shadow-lg leading-none animate-pulse">?</div>
+                    <div className="text-sm sm:text-base font-medium text-white/80 drop-shadow-md mt-4 tracking-wide">Đang đợi người ấy...</div>
+                  </div>
+                )}
 
-                <div className="mt-2 sm:mt-4 flex items-center justify-center gap-2 sm:gap-3 bg-white/20 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
-                  <div className="flex flex-col items-center w-10">
-                    <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.hours.toString().padStart(2, '0')}</span>
-                    <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Giờ</span>
-                  </div>
-                  
-                  <span className="text-xl font-bold text-pink-200 animate-pulse pb-4">:</span>
-                  
-                  <div className="flex flex-col items-center w-10">
-                    <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.minutes.toString().padStart(2, '0')}</span>
-                    <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Phút</span>
-                  </div>
-
-                  <span className="text-xl font-bold text-pink-200 animate-pulse pb-4">:</span>
-                  
-                  <div className="flex flex-col items-center w-10">
-                    <span className="text-xl sm:text-2xl font-bold text-white font-mono drop-shadow-sm">{loveTime.seconds.toString().padStart(2, '0')}</span>
-                    <span className="text-[9px] font-bold text-pink-100 uppercase tracking-wider mt-0.5">Giây</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="relative z-10 text-center flex flex-col items-center -mt-6">
-                <div className="text-6xl sm:text-8xl font-black text-white/40 drop-shadow-lg leading-none animate-pulse">?</div>
-                <div className="text-sm sm:text-base font-medium text-white/80 drop-shadow-md mt-4 tracking-wide">Đang đợi người ấy...</div>
-              </div>
+                {/* 4 Trái tim nhỏ bay quanh gốc */}
+                <Heart className="absolute -top-8 -left-8 sm:-top-12 sm:-left-12 w-12 h-12 text-pink-400 fill-pink-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0s', animationDuration: '2s' }} />
+                <Heart className="absolute -top-8 -right-8 sm:-top-10 sm:-right-10 w-10 h-10 text-rose-400 fill-rose-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.3s', animationDuration: '2.2s' }} />
+                <Heart className="absolute -bottom-8 -left-8 sm:-bottom-12 sm:-left-12 w-10 h-10 text-red-400 fill-red-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0.6s', animationDuration: '2.5s' }} />
+                <Heart className="absolute -bottom-8 -right-8 sm:-bottom-10 sm:-right-10 w-12 h-12 text-pink-400 fill-pink-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.9s', animationDuration: '2.8s' }} />
+              </motion.div>
             )}
 
-            {/* Floating Hearts Around */}
-            <Heart className="absolute -top-8 -left-8 sm:-top-12 sm:-left-12 w-12 h-12 text-pink-400 fill-pink-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0s', animationDuration: '2s' }} />
-            <Heart className="absolute -top-8 -right-8 sm:-top-10 sm:-right-10 w-10 h-10 text-rose-400 fill-rose-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.3s', animationDuration: '2.2s' }} />
-            <Heart className="absolute -bottom-8 -left-8 sm:-bottom-12 sm:-left-12 w-10 h-10 text-red-400 fill-red-400 opacity-60 animate-bounce pointer-events-none" style={{ animationDelay: '0.6s', animationDuration: '2.5s' }} />
-            <Heart className="absolute -bottom-8 -right-8 sm:-bottom-10 sm:-right-10 w-12 h-12 text-pink-400 fill-pink-400 opacity-70 animate-bounce pointer-events-none" style={{ animationDelay: '0.9s', animationDuration: '2.8s' }} />
-          </div>
+            {/* LỚP 2: BẢNG CHỮ LÃNG MẠN (Xuất hiện mượt mà ngay tại chỗ sau khi nổ xong) */}
+            {phase === "messages" && (
+              <motion.div
+                key="post-explode-badge"
+                className="absolute z-20 text-center flex flex-col items-center gap-5"
+                initial={{ opacity: 0, scale: 0.7, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+              >
+                <div 
+                  className="rounded-4xl px-10 py-6 border-2 border-pink-200 bg-white/60 backdrop-blur-xl shadow-[0_15px_35px_rgba(244,114,182,0.25)]"
+                >
+                  <p 
+                    style={{ fontFamily: "'Great Vibes', cursive", color: "#c4497a", fontSize: "clamp(2.2rem, 6vw, 3.6rem)", textShadow: "0 2px 10px #ffb3c688" }} 
+                    className="animate-pulse whitespace-nowrap font-medium"
+                  >
+                    🩷 Anh Yêu Em 🩷
+                  </p>
+                </div>
+                <button
+                  onClick={resetAnimation}
+                  className="px-6 py-2.5 bg-white/90 hover:bg-white text-pink-600 font-bold text-sm rounded-full border border-pink-200 shadow-md hover:scale-105 active:scale-95 transition-all"
+                >
+                  ✨ Trở lại đếm ngày
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Date Info */}
+        {/* Cấu trúc Khung Ngày tháng và Trích dẫn bên dưới giữ nguyên bản */}
         <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 w-full max-w-sm border border-white/50">
           {isEditingDate ? (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Thời khắc bắt đầu yêu</label>
-                <input
-                  type="datetime-local"
-                  value={editDateInput}
-                  onChange={(e) => setEditDateInput(e.target.value)}
-                  className="w-full px-4 py-3 bg-pink-50/50 border border-pink-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium"
-                />
+                <input type="datetime-local" value={editDateInput} onChange={(e) => setEditDateInput(e.target.value)} className="w-full px-4 py-3 bg-pink-50/50 border border-pink-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-gray-700 font-medium" />
               </div>
-              <button 
-                onClick={handleSaveDate}
-                className="w-full mt-2 py-3 bg-linear-to-r from-pink-400 to-rose-500 hover:from-pink-500 hover:to-rose-600 text-white font-bold rounded-xl shadow-lg shadow-pink-200 transform transition-all active:scale-[0.98]"
-              >
+              <button onClick={handleSaveDate} className="w-full mt-2 py-3 bg-linear-to-r from-pink-400 to-rose-500 hover:from-pink-500 hover:to-rose-600 text-white font-bold rounded-xl shadow-lg shadow-pink-200 transform transition-all active:scale-[0.98]">
                 Lưu ngày
               </button>
             </div>
@@ -411,11 +491,8 @@ export default function HomePage() {
                 <span>Bắt đầu yêu từ</span>
               </div>
               <div className="text-2xl font-bold text-transparent bg-clip-text bg-linear-to-r from-pink-600 to-rose-600 mb-5">
-                {startDateDB ? new Date(startDateDB).toLocaleString('vi-VN', {
-                  hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
-                }) : 'Chưa thiết lập'}
+                {startDateDB ? new Date(startDateDB).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Chưa thiết lập'}
               </div>
-              
               {hasPartner && (
                 <button onClick={() => setIsEditingDate(true)} className="text-sm font-bold text-pink-500 hover:text-pink-600 transition-colors hover:underline underline-offset-4">
                   Chỉnh sửa thời gian
@@ -425,7 +502,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Love Quote */}
         <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 max-w-md text-center shadow-sm border border-white/40">
           <p className="text-gray-800 italic font-medium leading-relaxed">
             "Mỗi ngày trôi qua là một khoảnh khắc đáng trân trọng bên người mình yêu thương"
@@ -436,9 +512,44 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Animations CSS */}
+      {/* ======================================================== */}
+      {/* CÁC LỚP LAYER HIỆU ỨNG CHẠY TRỰC TIẾP TRÊN TRANG CHỦ */}
+      {/* ======================================================== */}
+
+      {/* Lớp hạt Emojis bắn lả tả */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-100">
+        {particles.map(p => (
+          <div key={p.id} className="absolute select-none transition-all duration-75" style={{ left: `${p.x}%`, top: `${p.y}%`, fontSize: p.size, transform: "translate(-50%,-50%)", lineHeight: 1 }}>
+            {p.emoji}
+          </div>
+        ))}
+      </div>
+
+      {/* Lớp dòng chữ tình yêu bay lên trời */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-90">
+        <AnimatePresence>
+          {floatingTexts.map(ft => (
+            <motion.div
+              key={ft.id}
+              className="absolute whitespace-nowrap select-none"
+              style={{
+                left: `${ft.x}%`, bottom: 0, fontFamily: "'Dancing Script', cursive",
+                fontSize: `clamp(1rem, ${ft.size * 1.6}vw, ${ft.size * 2}rem)`, color: ft.color,
+                textShadow: `0 1px 6px ${ft.color}88, 0 0 18px ${ft.color}44`, fontWeight: 700,
+              }}
+              initial={{ y: "15vh", opacity: 0 }}
+              animate={{ y: "-125vh", opacity: [0, 1, 1, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ y: { duration: ft.duration, ease: "linear" }, opacity: { duration: ft.duration, times: [0, 0.07, 0.9, 1] } }}
+            >
+              {ft.text}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       <style>{`
-        @keyframes heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.05); } 50% { transform: scale(1); } 75% { transform: scale(1.03); } }
+        @keyframes heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.04); } 50% { transform: scale(1); } 75% { transform: scale(1.02); } }
         @keyframes float { 0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; } 10%, 90% { opacity: 0.6; } 50% { transform: translateY(-100px) translateX(20px) rotate(180deg); } }
         .animate-heartbeat { animation: heartbeat 2s ease-in-out infinite; }
         .animate-float { animation: float 6s ease-in-out infinite; }
