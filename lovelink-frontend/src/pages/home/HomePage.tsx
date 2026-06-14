@@ -189,7 +189,7 @@ export default function HomePage() {
     const msg = LOVE_MESSAGES[id % LOVE_MESSAGES.length];
     const newText: FloatingText = {
       id, text: msg, x: Math.random() * 72 + 4,
-      duration: 5 + Math.random() * 4,
+      duration: 8 + Math.random() * 5,
       size: 0.85 + Math.random() * 0.55,
       color: TEXT_COLORS[Math.floor(Math.random() * TEXT_COLORS.length)],
     };
@@ -465,7 +465,7 @@ export default function HomePage() {
                   onClick={resetAnimation}
                   className="px-6 py-2.5 bg-white/90 hover:bg-white text-pink-600 font-bold text-sm rounded-full border border-pink-200 shadow-md hover:scale-105 active:scale-95 transition-all"
                 >
-                  ✨ Trở lại đếm ngày
+                  Trở lại
                 </button>
               </motion.div>
             )}
