@@ -18,6 +18,7 @@ const LOVE_MESSAGES = [
   "Yêu em hơn tất cả những vì sao 🌠",
   "Em là lý do anh mỉm cười mỗi sáng ☀️",
   "Trái tim anh chỉ đập vì em 💓",
+  "Mỹ Lệ xinh gái nhất thế giới💓",
   "Em là bài thơ đẹp nhất anh được đọc 📖",
   "Cùng em, mọi ngày đều là thiên đường 🌸",
   "Anh không thể tưởng tượng cuộc sống không có em 🥺",
